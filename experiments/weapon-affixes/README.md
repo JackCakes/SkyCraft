@@ -28,6 +28,7 @@ normal Minecraft saves/inventory moves and syncs to multiplayer clients.
 | Berserker | +40% damage, -20% speed, +10% durability; greatsword/battleaxe only |
 | Giant | +20% damage, -10% speed, +0.75 reach; greatsword/battleaxe only |
 | Forceful | +5% damage, +0.85 attack knockback; sword/greatsword/battleaxe |
+| Veteran | +20% damage, +10% speed, +15% durability; only loot from level 20+ Skyrim actors |
 
 Static effects are per-stack Minecraft attribute/data-component overrides. Volatile is evaluated when
 damage reaches SkyCraft's Skyrim actor stand-in, after Minecraft has already applied normal weapon
@@ -120,3 +121,17 @@ These are stored on the Minecraft weapon whether or not it rolled an affix. This
 layer distinguish, for example, a generic low-level bandit weapon from loot taken from a particular
 boss/base NPC without trying to reconstruct that information after Skyrim has already removed the
 source item.
+
+
+## Source-aware affix pools
+
+Affix JSON entries can now restrict themselves by loot origin:
+
+- `minSourceLevel` / `maxSourceLevel` gate an affix by the Skyrim actor level that owned the item.
+  A max of 0 means no upper limit.
+- `allowedSourceBaseFormIds` is `["*"]` by default. Replace it with one or more hexadecimal Skyrim
+  base FormIDs to make a prefix exclusive to particular NPC/base records.
+
+The default **Veteran** prefix is the first source-aware example: it enters the weighted pool only
+when the weapon came from a level-20-or-higher Skyrim actor. Console-created weapons and chest/world
+loot have source level 0 and therefore cannot roll Veteran.

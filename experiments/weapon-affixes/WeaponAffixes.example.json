@@ -15,7 +15,12 @@
         "*"
       ],
       "enabled": true,
-      "knockbackAdd": 0
+      "knockbackAdd": 0,
+      "allowedSourceBaseFormIds": [
+        "*"
+      ],
+      "minSourceLevel": 0,
+      "maxSourceLevel": 0
     },
     {
       "id": "swift",
@@ -32,7 +37,12 @@
         "skyrim_iron_sword"
       ],
       "enabled": true,
-      "knockbackAdd": 0
+      "knockbackAdd": 0,
+      "allowedSourceBaseFormIds": [
+        "*"
+      ],
+      "minSourceLevel": 0,
+      "maxSourceLevel": 0
     },
     {
       "id": "long",
@@ -49,7 +59,12 @@
         "skyrim_iron_greatsword"
       ],
       "enabled": true,
-      "knockbackAdd": 0
+      "knockbackAdd": 0,
+      "allowedSourceBaseFormIds": [
+        "*"
+      ],
+      "minSourceLevel": 0,
+      "maxSourceLevel": 0
     },
     {
       "id": "sturdy",
@@ -65,7 +80,12 @@
         "*"
       ],
       "enabled": true,
-      "knockbackAdd": 0
+      "knockbackAdd": 0,
+      "allowedSourceBaseFormIds": [
+        "*"
+      ],
+      "minSourceLevel": 0,
+      "maxSourceLevel": 0
     },
     {
       "id": "volatile",
@@ -81,7 +101,12 @@
         "*"
       ],
       "enabled": true,
-      "knockbackAdd": 0
+      "knockbackAdd": 0,
+      "allowedSourceBaseFormIds": [
+        "*"
+      ],
+      "minSourceLevel": 0,
+      "maxSourceLevel": 0
     },
     {
       "id": "deadly",
@@ -97,7 +122,12 @@
         "*"
       ],
       "enabled": true,
-      "knockbackAdd": 0
+      "knockbackAdd": 0,
+      "allowedSourceBaseFormIds": [
+        "*"
+      ],
+      "minSourceLevel": 0,
+      "maxSourceLevel": 0
     },
     {
       "id": "flurried",
@@ -114,7 +144,12 @@
         "skyrim_iron_sword"
       ],
       "enabled": true,
-      "knockbackAdd": 0
+      "knockbackAdd": 0,
+      "allowedSourceBaseFormIds": [
+        "*"
+      ],
+      "minSourceLevel": 0,
+      "maxSourceLevel": 0
     },
     {
       "id": "berserker",
@@ -131,7 +166,12 @@
         "skyrim_iron_battleaxe"
       ],
       "enabled": true,
-      "knockbackAdd": 0
+      "knockbackAdd": 0,
+      "allowedSourceBaseFormIds": [
+        "*"
+      ],
+      "minSourceLevel": 0,
+      "maxSourceLevel": 0
     },
     {
       "id": "giant",
@@ -148,7 +188,12 @@
         "skyrim_iron_battleaxe"
       ],
       "enabled": true,
-      "knockbackAdd": 0
+      "knockbackAdd": 0,
+      "allowedSourceBaseFormIds": [
+        "*"
+      ],
+      "minSourceLevel": 0,
+      "maxSourceLevel": 0
     },
     {
       "id": "forceful",
@@ -166,6 +211,32 @@
         "skyrim_iron_greatsword",
         "skyrim_iron_battleaxe"
       ],
+      "enabled": true,
+      "allowedSourceBaseFormIds": [
+        "*"
+      ],
+      "minSourceLevel": 0,
+      "maxSourceLevel": 0
+    },
+    {
+      "id": "veteran",
+      "displayName": "Veteran",
+      "weight": 8,
+      "damageMultiplier": 1.2,
+      "attackSpeedMultiplier": 1.1,
+      "reachAdd": 0,
+      "durabilityMultiplier": 1.15,
+      "knockbackAdd": 0,
+      "procChance": 0,
+      "procDamageMultiplier": 1,
+      "allowedWeapons": [
+        "*"
+      ],
+      "allowedSourceBaseFormIds": [
+        "*"
+      ],
+      "minSourceLevel": 20,
+      "maxSourceLevel": 0,
       "enabled": true
     }
   ]

@@ -129,7 +129,7 @@ public final class WeaponAffixes {
                         player.sendSystemMessage(Component.literal("Hold a SkyCraft weapon to view its affix chances."));
                         return 0;
                     }
-                    List<AffixDefinition> candidates = candidatesFor(stack);
+                    List<AffixDefinition> candidates = candidatesFor(stack, sourceBaseFormId, sourceLevel);
                     double total = candidates.stream().mapToDouble(def -> def.weight).sum();
                     StringBuilder out = new StringBuilder("Affix chances: ");
                     out.append(String.format("None %.1f%%", (1.0 - config.rollChance) * 100.0));
@@ -242,15 +242,27 @@ public final class WeaponAffixes {
     }
 
     private static List<AffixDefinition> candidatesFor(ItemStack stack) {
+        return candidatesFor(stack, sourceBaseFormId(stack), sourceLevel(stack));
+    }
+
+    private static List<AffixDefinition> candidatesFor(ItemStack stack, int sourceBaseFormId, int sourceLevel) {
         return BY_ID.values().stream()
-            .filter(def -> appliesTo(def, stack))
+            .filter(def -> appliesTo(def, stack, sourceBaseFormId, sourceLevel))
             .toList();
     }
 
-    private static boolean appliesTo(AffixDefinition def, ItemStack stack) {
+    private static boolean appliesTo(AffixDefinition def, ItemStack stack, int sourceBaseFormId, int sourceLevel) {
         if (def == null || stack == null || stack.isEmpty()) return false;
         Identifier itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
-        return itemId != null && appliesToPath(def, itemId.getPath());
+        if (itemId == null || !appliesToPath(def, itemId.getPath())) return false;
+        if (sourceLevel < def.minSourceLevel) return false;
+        if (def.maxSourceLevel > 0 && sourceLevel > def.maxSourceLevel) return false;
+        if (!def.allowedSourceBaseFormIds.contains("*")) {
+            if (sourceBaseFormId == 0) return false;
+            String sourceHex = String.format("%08x", sourceBaseFormId);
+            if (!def.allowedSourceBaseFormIds.contains(sourceHex)) return false;
+        }
+        return true;
     }
 
     private static boolean appliesToPath(AffixDefinition def, String path) {
@@ -450,6 +462,34 @@ public final class WeaponAffixes {
         d.knockbackAdd = clamp(d.knockbackAdd, -1.0, 5.0);
         d.procChance = clamp(d.procChance, 0.0, 1.0);
         d.procDamageMultiplier = clamp(d.procDamageMultiplier, 1.0, 20.0);
+        d.minSourceLevel = Math.max(0, Math.min(65535, d.minSourceLevel));
+        d.maxSourceLevel = Math.max(0, Math.min(65535, d.maxSourceLevel));
+        if (d.maxSourceLevel > 0 && d.maxSourceLevel < d.minSourceLevel) {
+            int swap = d.minSourceLevel;
+            d.minSourceLevel = d.maxSourceLevel;
+            d.maxSourceLevel = swap;
+        }
+        if (d.allowedSourceBaseFormIds == null || d.allowedSourceBaseFormIds.isEmpty()) {
+            d.allowedSourceBaseFormIds = new ArrayList<>(List.of("*"));
+        } else {
+            ArrayList<String> sources = new ArrayList<>();
+            for (String raw : d.allowedSourceBaseFormIds) {
+                if (raw == null) continue;
+                String source = raw.trim().toLowerCase(java.util.Locale.ROOT);
+                if (source.startsWith("0x")) source = source.substring(2);
+                if ("*".equals(source)) {
+                    sources.clear();
+                    sources.add("*");
+                    break;
+                }
+                if (source.matches("[0-9a-f]{1,8}")) {
+                    source = String.format("%08x", Long.parseUnsignedLong(source, 16));
+                    if (!sources.contains(source)) sources.add(source);
+                }
+            }
+            if (sources.isEmpty()) sources.add("*");
+            d.allowedSourceBaseFormIds = sources;
+        }
         if (d.allowedWeapons == null || d.allowedWeapons.isEmpty()) {
             d.allowedWeapons = new ArrayList<>(List.of("*"));
         } else {
@@ -486,6 +526,9 @@ public final class WeaponAffixes {
             new AffixDefinition("giant", "Giant", 8, 1.20, 0.90, 0.75, 1.0, 0.0, 1.0, List.of("skyrim_iron_greatsword", "skyrim_iron_battleaxe"), true),
             new AffixDefinition("forceful", "Forceful", 10, 1.05, 1.0, 0.0, 1.0, 0.85, 0.0, 1.0, List.of("skyrim_iron_sword", "skyrim_iron_greatsword", "skyrim_iron_battleaxe"), true)
         ));
+        AffixDefinition veteran = new AffixDefinition("veteran", "Veteran", 8, 1.20, 1.10, 0.0, 1.15, 0.0, 1.0, List.of("*"), true);
+        veteran.minSourceLevel = 20;
+        c.affixes.add(veteran);
         return c;
     }
 
@@ -520,6 +563,9 @@ public final class WeaponAffixes {
         public double procChance = 0.0;
         public double procDamageMultiplier = 1.0;
         public List<String> allowedWeapons = new ArrayList<>(List.of("*"));
+        public List<String> allowedSourceBaseFormIds = new ArrayList<>(List.of("*"));
+        public int minSourceLevel = 0;
+        public int maxSourceLevel = 0;
         public boolean enabled = true;
 
         public AffixDefinition() {}
