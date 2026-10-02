@@ -239,9 +239,12 @@ namespace skycraft
 		{
 			static RE::BSEventNotifyControl thunk(RE::PlayerControls* a_this, RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>* a_source)
 			{
-				if (!State().minecraftOwnsPlayer || Game::SkyrimMenuOpen()) {
+				const auto& st = State();
+				if ((!st.minecraftOwnsPlayer && !st.skateOwnsPlayer) || Game::SkyrimMenuOpen()) {
 					return func(a_this, a_event, a_source);
 				}
+				// Minecraft or the Skate host owns movement. Menus still preempt this hook,
+				// but Skyrim must not apply a second movement/action stream underneath them.
 				return RE::BSEventNotifyControl::kContinue;
 			}
 			static inline REL::Relocation<decltype(thunk)> func;
