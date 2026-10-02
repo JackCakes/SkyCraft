@@ -40,18 +40,62 @@ public final class SkyrimWeapons {
     private static final LinkedHashMap<String, Stats> DEFAULTS = new LinkedHashMap<>();
     private static final Map<String, Item> ITEMS = new LinkedHashMap<>();
 
+    private enum WeaponClass {
+        DAGGER(4.0, 2.0, 1.8, 150),
+        SWORD(6.0, 1.6, 2.5, 200),
+        WAR_AXE(7.0, 1.4, 2.5, 250),
+        MACE(8.0, 1.2, 2.5, 300),
+        GREATSWORD(11.0, 1.0, 3.0, 350),
+        BATTLEAXE(12.0, 0.9, 3.0, 400),
+        WARHAMMER(13.0, 0.8, 3.0, 450);
+
+        final double damage;
+        final double speed;
+        final double reach;
+        final int durability;
+
+        WeaponClass(double damage, double speed, double reach, int durability) {
+            this.damage = damage;
+            this.speed = speed;
+            this.reach = reach;
+            this.durability = durability;
+        }
+    }
+
+    private enum MaterialTier {
+        IRON(0.0, 0),
+        DWARVEN(2.0, 150);
+
+        final double damageBonus;
+        final int durabilityBonus;
+
+        MaterialTier(double damageBonus, int durabilityBonus) {
+            this.damageBonus = damageBonus;
+            this.durabilityBonus = durabilityBonus;
+        }
+    }
+
     static {
-        DEFAULTS.put("skyrim_iron_dagger", new Stats(4.0, 2.0, 1.8, 150));
-        DEFAULTS.put("skyrim_iron_sword", new Stats(6.0, 1.6, 2.5, 200));
-        DEFAULTS.put("skyrim_iron_greatsword", new Stats(11.0, 1.0, 3.0, 350));
-        DEFAULTS.put("skyrim_iron_battleaxe", new Stats(12.0, 0.9, 3.0, 400));
-        DEFAULTS.put("skyrim_dwarven_dagger", new Stats(6.0, 2.0, 1.8, 300));
-        DEFAULTS.put("skyrim_dwarven_sword", new Stats(8.0, 1.6, 2.5, 400));
-        DEFAULTS.put("skyrim_dwarven_war_axe", new Stats(9.0, 1.4, 2.5, 450));
-        DEFAULTS.put("skyrim_dwarven_mace", new Stats(10.0, 1.2, 2.5, 500));
-        DEFAULTS.put("skyrim_dwarven_greatsword", new Stats(13.0, 1.0, 3.0, 550));
-        DEFAULTS.put("skyrim_dwarven_battleaxe", new Stats(14.0, 0.9, 3.0, 600));
-        DEFAULTS.put("skyrim_dwarven_warhammer", new Stats(15.0, 0.8, 3.0, 650));
+        add("skyrim_iron_dagger", MaterialTier.IRON, WeaponClass.DAGGER);
+        add("skyrim_iron_sword", MaterialTier.IRON, WeaponClass.SWORD);
+        add("skyrim_iron_greatsword", MaterialTier.IRON, WeaponClass.GREATSWORD);
+        add("skyrim_iron_battleaxe", MaterialTier.IRON, WeaponClass.BATTLEAXE);
+
+        add("skyrim_dwarven_dagger", MaterialTier.DWARVEN, WeaponClass.DAGGER);
+        add("skyrim_dwarven_sword", MaterialTier.DWARVEN, WeaponClass.SWORD);
+        add("skyrim_dwarven_war_axe", MaterialTier.DWARVEN, WeaponClass.WAR_AXE);
+        add("skyrim_dwarven_mace", MaterialTier.DWARVEN, WeaponClass.MACE);
+        add("skyrim_dwarven_greatsword", MaterialTier.DWARVEN, WeaponClass.GREATSWORD);
+        add("skyrim_dwarven_battleaxe", MaterialTier.DWARVEN, WeaponClass.BATTLEAXE);
+        add("skyrim_dwarven_warhammer", MaterialTier.DWARVEN, WeaponClass.WARHAMMER);
+    }
+
+    private static void add(String id, MaterialTier material, WeaponClass weaponClass) {
+        DEFAULTS.put(id, new Stats(
+            weaponClass.damage + material.damageBonus,
+            weaponClass.speed,
+            weaponClass.reach,
+            weaponClass.durability + material.durabilityBonus));
     }
 
     private SkyrimWeapons() {}
