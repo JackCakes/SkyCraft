@@ -1,0 +1,38 @@
+name: SKSE prototype build
+
+on:
+  push:
+    branches: ["feature/skate-bridge"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  skse:
+    runs-on: windows-2025-vs2026
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://github.com/microsoft/vcpkg .tools/vcpkg
+          .\.tools\vcpkg\bootstrap-vcpkg.bat
+
+      - name: Configure SKSE
+        working-directory: skse
+        run: cmake --preset default
+
+      - name: Build SKSE
+        working-directory: skse
+        run: cmake --build --preset release
+
+      - name: Upload prototype DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkyCraft-SkateBridge-SKSE
+          path: |
+            skse/build/RelWithDebInfo/SkyCraft.dll
+            skse/build/RelWithDebInfo/SkyCraft.pdb
+          if-no-files-found: error
