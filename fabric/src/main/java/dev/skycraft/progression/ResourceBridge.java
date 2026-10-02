@@ -3,6 +3,7 @@ package dev.skycraft.progression;
 import dev.skycraft.SkyCraft;
 import dev.skycraft.link.Proto;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Prediction;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -44,7 +45,7 @@ public final class ResourceBridge {
 			// Full Minecraft inventory must not destroy a Skyrim item. Overflow becomes a normal
 			// Minecraft item entity at the player's feet and is still considered accepted.
 			if (overflow > 0) {
-				var dropped = player.drop(stack, false);
+				var dropped = player.drop(stack, false, Prediction.SERVER_ONLY);
 				if (dropped != null) {
 					accepted += overflow;
 				}
