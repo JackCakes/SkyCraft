@@ -332,7 +332,7 @@ namespace skycraft::ResourceBridge
 			CapCarryToInventory(a_transfer.formId);
 		}
 
-		bool Queue(const Mapping& a_mapping, std::int32_t a_sourceCount, std::int32_t a_targetCount)
+		bool Queue(const Mapping& a_mapping, std::int32_t a_sourceCount, std::int32_t a_targetCount, RE::FormID a_sourceFormId)
 		{
 			if (a_sourceCount <= 0 || a_targetCount <= 0 || !Link::Get().McAlive()) {
 				return false;
@@ -341,7 +341,7 @@ namespace skycraft::ResourceBridge
 			const auto requestId = NewRequestId();
 			if (!Link::Get().PushInput(
 					proto::kInResourceTransfer,
-					0,
+					static_cast<std::int32_t>(a_sourceFormId),
 					static_cast<std::int32_t>(requestId),
 					a_targetCount,
 					static_cast<std::int32_t>(a_mapping.itemHash))) {
@@ -359,6 +359,9 @@ namespace skycraft::ResourceBridge
 				a_mapping.minecraftCount,
 				a_mapping.ordinaryWeaponOnly
 			});
+			if (a_mapping.ordinaryWeaponOnly && a_sourceFormId != 0) {
+				BridgeInfo("weapon bridge: source container {:08X}", a_sourceFormId);
+			}
 			BridgeInfo("{}: requested {} x{} -> {} x{} (request {})",
 				a_mapping.ordinaryWeaponOnly ? "weapon bridge" : "progression bridge",
 				a_mapping.name, a_sourceCount, a_mapping.minecraftItem, a_targetCount, requestId);
@@ -407,7 +410,7 @@ namespace skycraft::ResourceBridge
 						BridgeInfo("weapon bridge: {} of {} newly acquired {} eligible; special/reserved copies stay in Skyrim",
 							eligible, a_event->itemCount, mapping.name);
 					}
-					Queue(mapping, eligible, eligible);
+					Queue(mapping, eligible, eligible, a_event->oldContainer);
 					return RE::BSEventNotifyControl::kContinue;
 				}
 
@@ -435,7 +438,7 @@ namespace skycraft::ResourceBridge
 					const auto sourceCount = chunkGroups * mapping.skyrimCount;
 					const auto targetCount = chunkGroups * mapping.minecraftCount;
 
-					if (!Queue(mapping, sourceCount, targetCount)) {
+					if (!Queue(mapping, sourceCount, targetCount, 0)) {
 						break;
 					}
 

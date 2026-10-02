@@ -82,3 +82,15 @@ Hold any SkyCraft weapon and run `/skyaffixes chances`. It prints that weapon fa
 effective probability for no affix and for every eligible prefix after applying both the global
 `rollChance` and the weighted per-weapon pool. This makes balancing the JSON table possible without
 doing hundreds of manual drops.
+
+
+## Skyrim loot provenance
+
+The experimental transfer now also carries Skyrim's `oldContainer` FormID for ordinary weapon
+pickups through the existing shared-memory input event (and through the multiplayer resource-transfer
+packet for guests). The raw source FormID is stored on the rolled Minecraft weapon and is visible in
+`/skyaffixes inspect` when nonzero.
+
+This does not change affix odds yet. It is groundwork for later rules such as boss/chief loot having
+better affix pools or a weapon remembering which Skyrim actor/container it came from. Console-created
+or world-source weapons may legitimately have source 00000000.

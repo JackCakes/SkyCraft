@@ -86,7 +86,7 @@ public final class WeaponAffixes {
                             return 0;
                         }
                         ItemStack stack = new ItemStack(item);
-                        apply(stack, def);
+                        apply(stack, def, 0);
                         player.getInventory().add(stack);
                         player.sendSystemMessage(Component.literal("Added deterministic test weapon with affix: " + def.displayName));
                         return 1;
@@ -106,6 +106,7 @@ public final class WeaponAffixes {
                         + " | reach " + String.format("%+.2f", affix.reachAdd)
                         + " | durability x" + trim(affix.durabilityMultiplier)
                         + " | proc " + Math.round(affix.procChance * 100.0) + "% x" + trim(affix.procDamageMultiplier)
+                        + (affix.sourceFormId != 0 ? String.format(" | Skyrim source %08X", affix.sourceFormId) : "")
                     ));
                     return 1;
                 }))
@@ -147,6 +148,10 @@ public final class WeaponAffixes {
 
     /** Roll at most one affix onto a fresh weapon. Existing affixed stacks are never rerolled. */
     public static Optional<String> roll(ItemStack stack, RandomSource random) {
+        return roll(stack, random, 0);
+    }
+
+    public static Optional<String> roll(ItemStack stack, RandomSource random, int sourceFormId) {
         if (!isEligible(stack) || hasRollMarker(stack) || BY_ID.isEmpty()) {
             return Optional.empty();
         }
@@ -180,7 +185,7 @@ public final class WeaponAffixes {
         }
         if (chosen == null) chosen = candidates.getFirst();
 
-        apply(stack, chosen);
+        apply(stack, chosen, sourceFormId);
         SkyCraft.LOG.info("SkyCraft affix: rolled {} on {}", chosen.id, BuiltInRegistries.ITEM.getKey(stack.getItem()));
         return Optional.of(chosen.id);
     }
@@ -256,11 +261,12 @@ public final class WeaponAffixes {
             stored.getDoubleOr("reachAdd", 0.0),
             stored.getDoubleOr("durabilityMultiplier", 1.0),
             stored.getDoubleOr("procChance", 0.0),
-            stored.getDoubleOr("procDamageMultiplier", 1.0)
+            stored.getDoubleOr("procDamageMultiplier", 1.0),
+            stored.getIntOr("sourceFormId", 0)
         ));
     }
 
-    private static void apply(ItemStack stack, AffixDefinition def) {
+    private static void apply(ItemStack stack, AffixDefinition def, int sourceFormId) {
         ItemAttributeModifiers.Builder attrs = ItemAttributeModifiers.builder();
         for (ItemAttributeModifiers.Entry entry : stack.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY).modifiers()) {
             attrs.add(entry.attribute(), entry.modifier(), entry.slot());
@@ -305,6 +311,7 @@ public final class WeaponAffixes {
         stored.putDouble("durabilityMultiplier", def.durabilityMultiplier);
         stored.putDouble("procChance", def.procChance);
         stored.putDouble("procDamageMultiplier", def.procDamageMultiplier);
+        stored.putInt("sourceFormId", sourceFormId);
         root.put(ROOT, stored);
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(root));
 
@@ -427,7 +434,8 @@ public final class WeaponAffixes {
         double reachAdd,
         double durabilityMultiplier,
         double procChance,
-        double procDamageMultiplier
+        double procDamageMultiplier,
+        int sourceFormId
     ) {}
 
     public static final class AffixConfig {

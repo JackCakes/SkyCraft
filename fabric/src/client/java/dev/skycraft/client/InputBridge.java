@@ -64,7 +64,7 @@ public final class InputBridge {
 			}
 			case Proto.IN_RELEASE_ALL -> releaseAll();
 			case Proto.IN_HURT -> hurt(minecraft, code, a / 100.0F, b, c);
-			case Proto.IN_RESOURCE_TRANSFER -> transferResource(minecraft, a, b, c);
+			case Proto.IN_RESOURCE_TRANSFER -> transferResource(minecraft, code, a, b, c);
 			case Proto.IN_OPEN_MENU -> {
 				if (minecraft.gui.screen() == null && minecraft.player != null) {
 					releaseAll();
@@ -100,7 +100,7 @@ public final class InputBridge {
 
 
 	/** Skyrim acquired a mapped item. Grant it on the authoritative Minecraft server. */
-	private static void transferResource(Minecraft minecraft, int requestId, int count, int itemHash) {
+	private static void transferResource(Minecraft minecraft, int sourceFormId, int requestId, int count, int itemHash) {
 		if (minecraft.player == null || count <= 0) {
 			resourceAck(requestId, itemHash, 0);
 			return;
@@ -109,7 +109,7 @@ public final class InputBridge {
 		if (server == null) {
 			if (net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(dev.skycraft.net.SkyNet.ResourceTransfer.TYPE)) {
 				net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
-					new dev.skycraft.net.SkyNet.ResourceTransfer(requestId, itemHash, count));
+					new dev.skycraft.net.SkyNet.ResourceTransfer(requestId, itemHash, count, sourceFormId));
 			} else {
 				resourceAck(requestId, itemHash, 0);
 			}
@@ -119,7 +119,7 @@ public final class InputBridge {
 		var uuid = minecraft.player.getUUID();
 		server.execute(() -> {
 			ServerPlayer player = server.getPlayerList().getPlayer(uuid);
-			int accepted = player != null ? ResourceBridge.grant(player, itemHash, count) : 0;
+			int accepted = player != null ? ResourceBridge.grant(player, itemHash, count, sourceFormId) : 0;
 			resourceAck(requestId, itemHash, accepted);
 		});
 	}
