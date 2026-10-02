@@ -11,7 +11,7 @@
 namespace skycraft::skateproto
 {
 	inline constexpr std::uint32_t kMagic = 0x4B534353;  // bytes: "SCSK"
-	inline constexpr std::uint32_t kVersion = 2;
+	inline constexpr std::uint32_t kVersion = 3;
 	inline constexpr wchar_t       kMappingName[] = L"Local\\SkyCraftSkate_v1";
 
 	inline constexpr std::uint64_t kOffHeader = 0x0000;
@@ -21,11 +21,13 @@ namespace skycraft::skateproto
 	inline constexpr std::uint64_t kOffCollisionRing = 0x1000;
 
 	inline constexpr std::uint64_t kCollisionRingBytes = 16ull << 20;
+	inline constexpr std::uint64_t kOffPoseFrame = kOffCollisionRing + kCollisionRingBytes;
+	inline constexpr std::uint64_t kPoseFrameBytes = 0x4000;
 	inline constexpr std::uint64_t kColRingHeadOff = 0x00;
 	inline constexpr std::uint64_t kColRingTailOff = 0x40;
 	inline constexpr std::uint64_t kColRingDataOff = 0x80;
 	inline constexpr std::uint64_t kColRingDataBytes = kCollisionRingBytes - kColRingDataOff;
-	inline constexpr std::uint64_t kMappingBytes = kOffCollisionRing + kCollisionRingBytes;
+	inline constexpr std::uint64_t kMappingBytes = kOffPoseFrame + kPoseFrameBytes;
 
 	enum SkyFlags : std::uint32_t
 	{
@@ -120,6 +122,32 @@ namespace skycraft::skateproto
 		std::uint32_t reserved[9];
 	};
 	static_assert(sizeof(InputState) == 64);
+
+	enum PoseFlags : std::uint32_t
+	{
+		kPoseValid = 1u << 0,
+	};
+	inline constexpr std::uint32_t kMaxPoseBones = 128;
+
+	struct BonePose
+	{
+		std::uint64_t nameHash;
+		float         matrix[16];
+	};
+	static_assert(sizeof(BonePose) == 72);
+
+	struct PoseFrame
+	{
+		std::uint32_t seq;
+		std::uint32_t flags;
+		std::uint64_t tick;
+		std::uint32_t boneCount;
+		std::uint32_t nameSetId;
+		std::uint32_t reserved[2];
+		BonePose      bones[kMaxPoseBones];
+	};
+	static_assert(sizeof(PoseFrame) == 9248);
+	static_assert(sizeof(PoseFrame) <= kPoseFrameBytes);
 
 	enum ColType : std::uint32_t
 	{
