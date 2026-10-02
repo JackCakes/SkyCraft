@@ -130,7 +130,7 @@ public final class WeaponAffixes {
                         player.sendSystemMessage(Component.literal("Hold a SkyCraft weapon to view its affix chances."));
                         return 0;
                     }
-                    List<AffixDefinition> candidates = candidatesFor(stack, sourceBaseFormId, sourceLevel);
+                    List<AffixDefinition> candidates = candidatesFor(stack);
                     double total = candidates.stream().mapToDouble(def -> def.weight).sum();
                     StringBuilder out = new StringBuilder("Affix chances: ");
                     out.append(String.format("None %.1f%%", (1.0 - config.rollChance) * 100.0));
@@ -178,7 +178,7 @@ public final class WeaponAffixes {
             return Optional.empty();
         }
 
-        List<AffixDefinition> candidates = candidatesFor(stack);
+        List<AffixDefinition> candidates = candidatesFor(stack, sourceBaseFormId, sourceLevel);
         if (candidates.isEmpty()) {
             markNoAffix(stack, sourceFormId, sourceBaseFormId, sourceLevel);
             return Optional.empty();
