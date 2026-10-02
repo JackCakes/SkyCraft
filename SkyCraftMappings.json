@@ -1,21 +1,450 @@
 {
-  "version": 1,
-  "notes": "Universal Skyrim -> Minecraft mappings. Restart Skyrim after editing. Ratios are acquisition-batch based in this test build.",
+  "version": 3,
+  "notes": "Validated progression.4 mappings plus experimental ordinary-weapon pickup bridge. Weapon entries convert only when the inventory entry is plain (not quest, equipped, favorited, enchanted, tempered, poisoned, renamed, or stolen).",
   "mappings": [
-    { "name": "Iron Ingot",     "skyrimFormId": "0005ACE4", "minecraftItem": "minecraft:iron_ingot", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
-    { "name": "Gold Ingot",     "skyrimFormId": "0005AD9E", "minecraftItem": "minecraft:gold_ingot", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
-    { "name": "Leather",        "skyrimFormId": "000DB5D2", "minecraftItem": "minecraft:leather", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
-    { "name": "Wheat",          "skyrimFormId": "0004B0BA", "minecraftItem": "minecraft:wheat", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
-    { "name": "Iron Ore",       "skyrimFormId": "00071CF3", "minecraftItem": "minecraft:raw_iron", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
-    { "name": "Gold Ore",       "skyrimFormId": "0005ACDE", "minecraftItem": "minecraft:raw_gold", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
-    { "name": "Red Apple",      "skyrimFormId": "00064B2E", "minecraftItem": "minecraft:apple", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
-    { "name": "Green Apple",    "skyrimFormId": "00064B2F", "minecraftItem": "minecraft:apple", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
-    { "name": "Bread",          "skyrimFormId": "00065C97", "minecraftItem": "minecraft:bread", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
-    { "name": "Carrot",         "skyrimFormId": "00064B40", "minecraftItem": "minecraft:carrot", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
-    { "name": "Potato",         "skyrimFormId": "00064B41", "minecraftItem": "minecraft:potato", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
-    { "name": "Chicken's Egg",  "skyrimFormId": "00023D77", "minecraftItem": "minecraft:egg", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
-    { "name": "Bone Meal",      "skyrimFormId": "00034CDD", "minecraftItem": "minecraft:bone_meal", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
-    { "name": "Iron Arrow",     "skyrimFormId": "0001397D", "minecraftItem": "minecraft:arrow", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
-    { "name": "Leather Strips", "skyrimFormId": "000800E4", "minecraftItem": "minecraft:leather", "skyrimCount": 4, "minecraftCount": 1, "enabled": true }
+    {
+      "name": "Iron Ingot",
+      "skyrimFormId": "0005ACE4",
+      "minecraftItem": "minecraft:iron_ingot",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Gold Ingot",
+      "skyrimFormId": "0005AD9E",
+      "minecraftItem": "minecraft:gold_ingot",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Leather",
+      "skyrimFormId": "000DB5D2",
+      "minecraftItem": "minecraft:leather",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Wheat",
+      "skyrimFormId": "0004B0BA",
+      "minecraftItem": "minecraft:wheat",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Iron Ore",
+      "skyrimFormId": "00071CF3",
+      "minecraftItem": "minecraft:raw_iron",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Gold Ore",
+      "skyrimFormId": "0005ACDE",
+      "minecraftItem": "minecraft:raw_gold",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Leather Strips",
+      "skyrimFormId": "000800E4",
+      "minecraftItem": "minecraft:leather",
+      "skyrimCount": 4,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Red Apple",
+      "skyrimFormId": "00064B2E",
+      "minecraftItem": "minecraft:apple",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Green Apple",
+      "skyrimFormId": "00064B2F",
+      "minecraftItem": "minecraft:apple",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Bread",
+      "skyrimFormId": "00065C97",
+      "minecraftItem": "minecraft:bread",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Carrot",
+      "skyrimFormId": "00064B40",
+      "minecraftItem": "minecraft:carrot",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Potato",
+      "skyrimFormId": "00064B41",
+      "minecraftItem": "minecraft:potato",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Chicken's Egg",
+      "skyrimFormId": "00023D77",
+      "minecraftItem": "minecraft:egg",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Chicken Breast",
+      "skyrimFormId": "000F2011",
+      "minecraftItem": "minecraft:chicken",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Raw Beef",
+      "skyrimFormId": "00065C99",
+      "minecraftItem": "minecraft:beef",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Raw Rabbit Leg",
+      "skyrimFormId": "00065C9E",
+      "minecraftItem": "minecraft:rabbit",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Salmon Meat",
+      "skyrimFormId": "00065C9F",
+      "minecraftItem": "minecraft:salmon",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Pheasant Breast",
+      "skyrimFormId": "00065C9D",
+      "minecraftItem": "minecraft:chicken",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Leg of Goat",
+      "skyrimFormId": "00065C9A",
+      "minecraftItem": "minecraft:mutton",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Venison",
+      "skyrimFormId": "000669A2",
+      "minecraftItem": "minecraft:mutton",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Cooked Beef",
+      "skyrimFormId": "000721E8",
+      "minecraftItem": "minecraft:cooked_beef",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Spiced Beef",
+      "skyrimFormId": "000CADFB",
+      "minecraftItem": "minecraft:cooked_beef",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Horse Haunch",
+      "skyrimFormId": "000722B0",
+      "minecraftItem": "minecraft:cooked_beef",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Grilled Chicken Breast",
+      "skyrimFormId": "000E8947",
+      "minecraftItem": "minecraft:cooked_chicken",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Charred Skeever Meat",
+      "skyrimFormId": "000E8448",
+      "minecraftItem": "minecraft:cooked_rabbit",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Rabbit Haunch",
+      "skyrimFormId": "000722C2",
+      "minecraftItem": "minecraft:cooked_rabbit",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Leg of Goat Roast",
+      "skyrimFormId": "0007224C",
+      "minecraftItem": "minecraft:cooked_mutton",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Salmon Steak",
+      "skyrimFormId": "00064B3B",
+      "minecraftItem": "minecraft:cooked_salmon",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Baked Potatoes",
+      "skyrimFormId": "00064B3A",
+      "minecraftItem": "minecraft:baked_potato",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Apple Pie",
+      "skyrimFormId": "00064B43",
+      "minecraftItem": "minecraft:pumpkin_pie",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Sweet Roll",
+      "skyrimFormId": "00064B3D",
+      "minecraftItem": "minecraft:pumpkin_pie",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Honey",
+      "skyrimFormId": "0010394D",
+      "minecraftItem": "minecraft:honey_bottle",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Bone Meal",
+      "skyrimFormId": "00034CDD",
+      "minecraftItem": "minecraft:bone_meal",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Snowberries",
+      "skyrimFormId": "0001B3BD",
+      "minecraftItem": "minecraft:sweet_berries",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Juniper Berries",
+      "skyrimFormId": "0005076E",
+      "minecraftItem": "minecraft:sweet_berries",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Hawk Feathers",
+      "skyrimFormId": "000E7ED0",
+      "minecraftItem": "minecraft:feather",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Hagraven Feathers",
+      "skyrimFormId": "0003AD66",
+      "minecraftItem": "minecraft:feather",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Honeycomb",
+      "skyrimFormId": "000B08C5",
+      "minecraftItem": "minecraft:honeycomb",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Moon Sugar",
+      "skyrimFormId": "000D8E3F",
+      "minecraftItem": "minecraft:sugar",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Ancient Nord Arrow",
+      "skyrimFormId": "00034182",
+      "minecraftItem": "minecraft:arrow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Daedric Arrow",
+      "skyrimFormId": "000139C0",
+      "minecraftItem": "minecraft:arrow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Dwarven Arrow",
+      "skyrimFormId": "000139BC",
+      "minecraftItem": "minecraft:arrow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Ebony Arrow",
+      "skyrimFormId": "000139BF",
+      "minecraftItem": "minecraft:arrow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Elven Arrow",
+      "skyrimFormId": "000139BD",
+      "minecraftItem": "minecraft:arrow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Falmer Arrow",
+      "skyrimFormId": "00038341",
+      "minecraftItem": "minecraft:arrow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Forsworn Arrow",
+      "skyrimFormId": "000CEE9E",
+      "minecraftItem": "minecraft:arrow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Glass Arrow",
+      "skyrimFormId": "000139BE",
+      "minecraftItem": "minecraft:arrow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Iron Arrow",
+      "skyrimFormId": "0001397D",
+      "minecraftItem": "minecraft:arrow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Nord Hero Arrow",
+      "skyrimFormId": "000EAFDF",
+      "minecraftItem": "minecraft:arrow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Orcish Arrow",
+      "skyrimFormId": "000139BB",
+      "minecraftItem": "minecraft:arrow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Steel Arrow",
+      "skyrimFormId": "0001397F",
+      "minecraftItem": "minecraft:arrow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "enabled": true
+    },
+    {
+      "name": "Iron Dagger",
+      "skyrimFormId": "0001397E",
+      "minecraftItem": "skycraft:skyrim_iron_dagger",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Iron Sword",
+      "skyrimFormId": "00012EB7",
+      "minecraftItem": "skycraft:skyrim_iron_sword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Iron Greatsword",
+      "skyrimFormId": "0001359D",
+      "minecraftItem": "skycraft:skyrim_iron_greatsword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Iron Battleaxe",
+      "skyrimFormId": "00013980",
+      "minecraftItem": "skycraft:skyrim_iron_battleaxe",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    }
   ]
 }

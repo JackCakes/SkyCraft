@@ -63,10 +63,11 @@ combat-code change.
 
 ## Skyrim mapping plan
 
-The included experimental WeaponMappings.example.json starts with four verified ordinary vanilla
-FormIDs. The actual pickup transaction is NOT wired yet. Do not merge these into the resource bridge
-until we add instance filtering so enchanted/unique/quest/scripted weapons cannot be flattened by
-accident.
+The four core vanilla FormIDs are now wired through the existing acknowledged resource-transfer path.
+A weapon is eligible only when its current Skyrim inventory entry is conservative/plain: no quest
+alias, equipped/favorited state, record or instance enchantment, temper health, poison, custom display
+name, or ownership/stolen data. If any copy of that base weapon is special, automatic conversion for
+that base form is skipped rather than risking removal of the wrong instance.
 
 ## Next sub-steps
 
@@ -108,3 +109,23 @@ Suggested first-pass feel checks:
 
 Edit `config/skycraft-weapons.json`, restart Minecraft, and rerun the test kit command to compare
 different numbers. No recompilation is required for stat tuning.
+
+
+## Prototype 2 end-to-end pickup path
+
+This branch now tests the actual gameplay loop rather than only /skyweapons testkit:
+
+Skyrim pickup -> plain-instance safety check -> Minecraft registry grant -> ACK -> Skyrim removal.
+
+The four enabled mappings live in the packaged SkyCraftMappings.json and target the registered
+skycraft: weapon ids. The source weapon remains in Skyrim until Minecraft ACKs the grant.
+
+The first test should use ordinary, unmodified items (console additem is fine):
+
+- Iron Dagger 0001397E
+- Iron Sword 00012EB7
+- Iron Greatsword 0001359D
+- Iron Battleaxe 00013980
+
+Expected: each disappears from Skyrim only after the corresponding custom item reaches Minecraft.
+Special copies are intentionally left alone in this prototype.

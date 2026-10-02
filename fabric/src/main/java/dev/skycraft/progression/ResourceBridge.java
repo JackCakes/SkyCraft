@@ -64,7 +64,9 @@ public final class ResourceBridge {
 		int accepted = 0;
 		int remaining = count;
 		while (remaining > 0) {
-			int chunk = Math.min(remaining, 64);
+			// Respect the registered item's own stack size. Custom weapons are max-stack 1;
+			// constructing a 64-count weapon stack would create invalid inventory state.
+			int chunk = Math.min(remaining, Math.max(1, item.getDefaultMaxStackSize()));
 			ItemStack stack = new ItemStack(item, chunk);
 			player.getInventory().add(stack);
 			int overflow = stack.getCount();
