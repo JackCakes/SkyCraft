@@ -110,6 +110,7 @@ public final class WeaponAffixes {
                     }
                     player.sendSystemMessage(Component.literal(
                         "Affix " + affix.id
+                        + " | rarity " + affix.rarity
                         + " | damage x" + trim(affix.damageMultiplier)
                         + " | speed x" + trim(affix.attackSpeedMultiplier)
                         + " | reach " + String.format("%+.2f", affix.reachAdd)
@@ -314,6 +315,7 @@ public final class WeaponAffixes {
         if (id.isEmpty() || "none".equals(id.get())) return Optional.empty();
         return Optional.of(new StoredAffix(
             id.get(),
+            stored.getString("rarity").orElse("uncommon"),
             stored.getDoubleOr("damageMultiplier", 1.0),
             stored.getDoubleOr("attackSpeedMultiplier", 1.0),
             stored.getDoubleOr("reachAdd", 0.0),
@@ -372,6 +374,7 @@ public final class WeaponAffixes {
         CompoundTag stored = new CompoundTag();
         stored.putInt("v", FORMAT);
         stored.putString("id", def.id);
+        stored.putString("rarity", def.rarity);
         stored.putDouble("damageMultiplier", def.damageMultiplier);
         stored.putDouble("attackSpeedMultiplier", def.attackSpeedMultiplier);
         stored.putDouble("reachAdd", def.reachAdd);
@@ -387,7 +390,7 @@ public final class WeaponAffixes {
 
         Component baseName = stack.getHoverName().copy();
         stack.set(DataComponents.CUSTOM_NAME,
-            Component.literal(def.displayName + " ").withStyle(ChatFormatting.GOLD).append(baseName));
+            Component.literal(def.displayName + " ").withStyle(rarityColor(def.rarity)).append(baseName));
 
         List<Component> lore = new ArrayList<>();
         if (Math.abs(def.damageMultiplier - 1.0) > 1.0E-6)
@@ -404,6 +407,17 @@ public final class WeaponAffixes {
             lore.add(Component.literal(Math.round(def.procChance * 100.0) + "% chance for x" + trim(def.procDamageMultiplier) + " damage")
                 .withStyle(ChatFormatting.LIGHT_PURPLE));
         if (!lore.isEmpty()) stack.set(DataComponents.LORE, new ItemLore(lore));
+    }
+
+    private static ChatFormatting rarityColor(String rarity) {
+        return switch (rarity) {
+            case "common" -> ChatFormatting.WHITE;
+            case "uncommon" -> ChatFormatting.GREEN;
+            case "rare" -> ChatFormatting.AQUA;
+            case "epic" -> ChatFormatting.LIGHT_PURPLE;
+            case "legendary" -> ChatFormatting.GOLD;
+            default -> ChatFormatting.GREEN;
+        };
     }
 
     private static String percent(double delta) {
@@ -454,6 +468,10 @@ public final class WeaponAffixes {
         if (!id.matches("[a-z0-9_./-]+")) return null;
         d.id = id;
         d.displayName = d.displayName.trim();
+        d.rarity = d.rarity == null ? "uncommon" : d.rarity.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!List.of("common", "uncommon", "rare", "epic", "legendary").contains(d.rarity)) {
+            d.rarity = "uncommon";
+        }
         d.weight = clamp(d.weight, 0.0, 1_000_000.0);
         d.damageMultiplier = clamp(d.damageMultiplier, 0.05, 10.0);
         d.attackSpeedMultiplier = clamp(d.attackSpeedMultiplier, 0.05, 10.0);
@@ -529,11 +547,20 @@ public final class WeaponAffixes {
         AffixDefinition veteran = new AffixDefinition("veteran", "Veteran", 8, 1.20, 1.10, 0.0, 1.15, 0.0, 1.0, List.of("*"), true);
         veteran.minSourceLevel = 20;
         c.affixes.add(veteran);
+        for (AffixDefinition def : c.affixes) {
+            def.rarity = switch (def.id) {
+                case "volatile" -> "epic";
+                case "berserker", "giant", "veteran" -> "rare";
+                case "deadly", "forceful" -> "uncommon";
+                default -> "uncommon";
+            };
+        }
         return c;
     }
 
     private record StoredAffix(
         String id,
+        String rarity,
         double damageMultiplier,
         double attackSpeedMultiplier,
         double reachAdd,
@@ -554,6 +581,7 @@ public final class WeaponAffixes {
     public static final class AffixDefinition {
         public String id;
         public String displayName;
+        public String rarity = "uncommon";
         public double weight = 1.0;
         public double damageMultiplier = 1.0;
         public double attackSpeedMultiplier = 1.0;

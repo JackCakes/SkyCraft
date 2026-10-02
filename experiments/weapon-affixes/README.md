@@ -135,3 +135,12 @@ Affix JSON entries can now restrict themselves by loot origin:
 The default **Veteran** prefix is the first source-aware example: it enters the weighted pool only
 when the weapon came from a level-20-or-higher Skyrim actor. Console-created weapons and chest/world
 loot have source level 0 and therefore cannot roll Veteran.
+
+
+## Data-driven affix rarity
+
+Each prefix now has a `rarity` field: `common`, `uncommon`, `rare`, `epic`, or
+`legendary`. Rarity is presentation metadata rather than a hidden power multiplier: it changes the
+prefix color on the actual weapon name and is stored on that weapon at roll time. This lets balance
+stay explicit in the numeric fields while still making exceptional drops immediately recognizable.
+The default Volatile prefix is Epic; Berserker, Giant and Veteran are Rare.

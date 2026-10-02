@@ -20,7 +20,8 @@
         "*"
       ],
       "minSourceLevel": 0,
-      "maxSourceLevel": 0
+      "maxSourceLevel": 0,
+      "rarity": "uncommon"
     },
     {
       "id": "swift",
@@ -42,7 +43,8 @@
         "*"
       ],
       "minSourceLevel": 0,
-      "maxSourceLevel": 0
+      "maxSourceLevel": 0,
+      "rarity": "uncommon"
     },
     {
       "id": "long",
@@ -64,7 +66,8 @@
         "*"
       ],
       "minSourceLevel": 0,
-      "maxSourceLevel": 0
+      "maxSourceLevel": 0,
+      "rarity": "uncommon"
     },
     {
       "id": "sturdy",
@@ -85,7 +88,8 @@
         "*"
       ],
       "minSourceLevel": 0,
-      "maxSourceLevel": 0
+      "maxSourceLevel": 0,
+      "rarity": "uncommon"
     },
     {
       "id": "volatile",
@@ -106,7 +110,8 @@
         "*"
       ],
       "minSourceLevel": 0,
-      "maxSourceLevel": 0
+      "maxSourceLevel": 0,
+      "rarity": "epic"
     },
     {
       "id": "deadly",
@@ -127,7 +132,8 @@
         "*"
       ],
       "minSourceLevel": 0,
-      "maxSourceLevel": 0
+      "maxSourceLevel": 0,
+      "rarity": "uncommon"
     },
     {
       "id": "flurried",
@@ -149,7 +155,8 @@
         "*"
       ],
       "minSourceLevel": 0,
-      "maxSourceLevel": 0
+      "maxSourceLevel": 0,
+      "rarity": "uncommon"
     },
     {
       "id": "berserker",
@@ -171,7 +178,8 @@
         "*"
       ],
       "minSourceLevel": 0,
-      "maxSourceLevel": 0
+      "maxSourceLevel": 0,
+      "rarity": "rare"
     },
     {
       "id": "giant",
@@ -193,7 +201,8 @@
         "*"
       ],
       "minSourceLevel": 0,
-      "maxSourceLevel": 0
+      "maxSourceLevel": 0,
+      "rarity": "rare"
     },
     {
       "id": "forceful",
@@ -216,7 +225,8 @@
         "*"
       ],
       "minSourceLevel": 0,
-      "maxSourceLevel": 0
+      "maxSourceLevel": 0,
+      "rarity": "uncommon"
     },
     {
       "id": "veteran",
@@ -237,7 +247,8 @@
       ],
       "minSourceLevel": 20,
       "maxSourceLevel": 0,
-      "enabled": true
+      "enabled": true,
+      "rarity": "rare"
     }
   ]
 }
