@@ -2,9 +2,17 @@
   "version": 1,
   "notes": "Experimental common-weapon mapping. Unique/enchanted/quest weapons intentionally excluded.",
   "mappings": [
-    { "name": "Iron Dagger",     "skyrimFormId": "0001397E", "minecraftItem": "skycraft:skyrim_iron_dagger",     "enabled": true },
-    { "name": "Iron Sword",      "skyrimFormId": "00012EB7", "minecraftItem": "skycraft:skyrim_iron_sword",      "enabled": true },
-    { "name": "Iron Greatsword", "skyrimFormId": "0001359D", "minecraftItem": "skycraft:skyrim_iron_greatsword", "enabled": true },
-    { "name": "Iron Battleaxe",  "skyrimFormId": "00013980", "minecraftItem": "skycraft:skyrim_iron_battleaxe",  "enabled": true }
+    { "name": "Iron Dagger",          "skyrimFormId": "0001397E", "minecraftItem": "skycraft:skyrim_iron_dagger",          "enabled": true },
+    { "name": "Iron Sword",           "skyrimFormId": "00012EB7", "minecraftItem": "skycraft:skyrim_iron_sword",           "enabled": true },
+    { "name": "Iron Greatsword",      "skyrimFormId": "0001359D", "minecraftItem": "skycraft:skyrim_iron_greatsword",      "enabled": true },
+    { "name": "Iron Battleaxe",       "skyrimFormId": "00013980", "minecraftItem": "skycraft:skyrim_iron_battleaxe",       "enabled": true },
+
+    { "name": "Dwarven Dagger",       "skyrimFormId": "00013996", "minecraftItem": "skycraft:skyrim_dwarven_dagger",       "enabled": true },
+    { "name": "Dwarven Sword",        "skyrimFormId": "00013999", "minecraftItem": "skycraft:skyrim_dwarven_sword",        "enabled": true },
+    { "name": "Dwarven War Axe",      "skyrimFormId": "00013993", "minecraftItem": "skycraft:skyrim_dwarven_war_axe",      "enabled": true },
+    { "name": "Dwarven Mace",         "skyrimFormId": "00013998", "minecraftItem": "skycraft:skyrim_dwarven_mace",         "enabled": true },
+    { "name": "Dwarven Greatsword",   "skyrimFormId": "00013997", "minecraftItem": "skycraft:skyrim_dwarven_greatsword",   "enabled": true },
+    { "name": "Dwarven Battleaxe",    "skyrimFormId": "00013994", "minecraftItem": "skycraft:skyrim_dwarven_battleaxe",    "enabled": true },
+    { "name": "Dwarven Warhammer",    "skyrimFormId": "0001399A", "minecraftItem": "skycraft:skyrim_dwarven_warhammer",    "enabled": true }
   ]
 }
