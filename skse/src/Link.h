@@ -27,7 +27,7 @@ namespace skycraft
 		bool ReadMcState(proto::McState& a_out) const;
 
 		// Input ring (producer side). Drops the event if MC has fallen a full ring behind.
-		void PushInput(proto::InputType a_type, std::uint16_t a_code, std::int32_t a_a = 0, std::int32_t a_b = 0, std::int32_t a_c = 0);
+		bool PushInput(proto::InputType a_type, std::uint16_t a_code, std::int32_t a_a = 0, std::int32_t a_b = 0, std::int32_t a_c = 0);
 
 		// Collision ring (producer side, one thread only). Returns false if the ring is full.
 		bool WriteCollision(proto::ColType a_type, const void* a_payload, std::uint32_t a_bytes);
