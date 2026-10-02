@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/skyrim-minecraft-progression
+      - experimental/ranged-magic
   workflow_dispatch:
 
 jobs:
