@@ -340,13 +340,25 @@ namespace skycraft::ResourceBridge
 
 			const auto requestId = NewRequestId();
 			// InputEvent::code is only 16 bits, so full Skyrim FormIDs travel in a small
-			// metadata event keyed by request id. Older consumers safely ignore type 10.
+			// metadata event keyed by request id. The 16-bit code is useful for actor level.
+			RE::FormID sourceBaseFormId = 0;
+			std::uint16_t sourceActorLevel = 0;
+			if (a_sourceFormId != 0) {
+				if (auto* sourceRef = RE::TESForm::LookupByID<RE::TESObjectREFR>(a_sourceFormId)) {
+					if (auto* base = sourceRef->GetBaseObject()) {
+						sourceBaseFormId = base->GetFormID();
+					}
+					if (auto* actor = sourceRef->As<RE::Actor>()) {
+						sourceActorLevel = static_cast<std::uint16_t>(std::clamp<std::uint32_t>(actor->GetLevel(), 0u, 65535u));
+					}
+				}
+			}
 			if (a_sourceFormId != 0 && !Link::Get().PushInput(
 					proto::kInResourceTransferSource,
-					0,
+					sourceActorLevel,
 					static_cast<std::int32_t>(requestId),
 					static_cast<std::int32_t>(a_sourceFormId),
-					0)) {
+					static_cast<std::int32_t>(sourceBaseFormId))) {
 				BridgeWarn("weapon bridge: input ring full while sending loot source; leaving Skyrim item untouched");
 				return false;
 			}
@@ -371,7 +383,7 @@ namespace skycraft::ResourceBridge
 				a_mapping.ordinaryWeaponOnly
 			});
 			if (a_mapping.ordinaryWeaponOnly && a_sourceFormId != 0) {
-				BridgeInfo("weapon bridge: source container {:08X}", a_sourceFormId);
+				BridgeInfo("weapon bridge: source container {:08X}, base {:08X}, level {}", a_sourceFormId, sourceBaseFormId, sourceActorLevel);
 			}
 			BridgeInfo("{}: requested {} x{} -> {} x{} (request {})",
 				a_mapping.ordinaryWeaponOnly ? "weapon bridge" : "progression bridge",

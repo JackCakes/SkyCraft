@@ -106,3 +106,17 @@ Affixes can now set `knockbackAdd`. This is applied through Minecraft's normal
 `ATTACK_KNOCKBACK` attribute, so SkyCraft's existing proxy-entity combat path captures the stronger
 Minecraft shove and forwards that knockback strength/direction into Skyrim along with the hit. It does
 not need a second custom Skyrim damage implementation.
+
+
+## Stable source identity for future loot rules
+
+For actor/corpse loot the provenance metadata now includes three independent values:
+
+- source reference FormID — the exact corpse/container instance,
+- source base FormID — the actor/container base record, useful for stable NPC-type rules,
+- source actor level — 0 for non-actor containers.
+
+These are stored on the Minecraft weapon whether or not it rolled an affix. This lets a later balance
+layer distinguish, for example, a generic low-level bandit weapon from loot taken from a particular
+boss/base NPC without trying to reconstruct that information after Skyrim has already removed the
+source item.

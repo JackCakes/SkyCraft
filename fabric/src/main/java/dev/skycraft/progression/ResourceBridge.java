@@ -52,6 +52,10 @@ public final class ResourceBridge {
 	}
 
 	public static int grant(ServerPlayer player, int itemHash, int requested, int sourceFormId) {
+		return grant(player, itemHash, requested, sourceFormId, 0, 0);
+	}
+
+	public static int grant(ServerPlayer player, int itemHash, int requested, int sourceFormId, int sourceBaseFormId, int sourceLevel) {
 		if (player == null || requested <= 0) return 0;
 		ensureIndex();
 		if (HASH_COLLISIONS.contains(itemHash)) {
@@ -73,7 +77,7 @@ public final class ResourceBridge {
 			int chunk = Math.min(remaining, Math.max(1, item.getDefaultMaxStackSize()));
 			ItemStack stack = new ItemStack(item, chunk);
 			if (chunk == 1 && dev.skycraft.weapon.WeaponAffixes.isEligible(stack)) {
-				dev.skycraft.weapon.WeaponAffixes.roll(stack, player.getRandom(), sourceFormId);
+				dev.skycraft.weapon.WeaponAffixes.roll(stack, player.getRandom(), sourceFormId, sourceBaseFormId, sourceLevel);
 			}
 			player.getInventory().add(stack);
 			int overflow = stack.getCount();

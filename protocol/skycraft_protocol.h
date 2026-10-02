@@ -183,7 +183,8 @@ namespace skycraft::proto
 		kInResourceTransfer = 9,  // universal mapping: a = request id, b = Minecraft output count,
 		                          // c = FNV-1a 32-bit hash of the Minecraft registry id; code reserved
 		kInResourceTransferSource = 10, // optional metadata immediately before transfer:
-		                                // a = request id, b = full 32-bit Skyrim oldContainer FormID
+		                                // code = source actor level (0 if not an actor),
+		                                // a = request id, b = full oldContainer FormID, c = source base FormID
 	};
 
 	enum HurtKind : std::uint16_t

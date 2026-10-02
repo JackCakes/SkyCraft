@@ -86,7 +86,7 @@ public final class WeaponAffixes {
                             return 0;
                         }
                         ItemStack stack = new ItemStack(item);
-                        apply(stack, def, 0);
+                        apply(stack, def, 0, 0, 0);
                         player.getInventory().add(stack);
                         player.sendSystemMessage(Component.literal("Added deterministic test weapon with affix: " + def.displayName));
                         return 1;
@@ -97,9 +97,13 @@ public final class WeaponAffixes {
                     StoredAffix affix = readStored(stack).orElse(null);
                     if (affix == null) {
                         int sourceFormId = sourceFormId(stack);
+                        int sourceBaseFormId = sourceBaseFormId(stack);
+                        int sourceLevel = sourceLevel(stack);
                         player.sendSystemMessage(Component.literal(
                             "Held item has no SkyCraft affix"
                             + (sourceFormId != 0 ? String.format(" | Skyrim source %08X", sourceFormId) : "")
+                            + (sourceBaseFormId != 0 ? String.format(" | base %08X", sourceBaseFormId) : "")
+                            + (sourceLevel > 0 ? " | source level " + sourceLevel : "")
                             + "."
                         ));
                         return 0;
@@ -113,6 +117,8 @@ public final class WeaponAffixes {
                         + " | knockback " + String.format("%+.2f", affix.knockbackAdd)
                         + " | proc " + Math.round(affix.procChance * 100.0) + "% x" + trim(affix.procDamageMultiplier)
                         + (affix.sourceFormId != 0 ? String.format(" | Skyrim source %08X", affix.sourceFormId) : "")
+                        + (affix.sourceBaseFormId != 0 ? String.format(" | base %08X", affix.sourceBaseFormId) : "")
+                        + (affix.sourceLevel > 0 ? " | source level " + affix.sourceLevel : "")
                     ));
                     return 1;
                 }))
@@ -158,25 +164,29 @@ public final class WeaponAffixes {
     }
 
     public static Optional<String> roll(ItemStack stack, RandomSource random, int sourceFormId) {
+        return roll(stack, random, sourceFormId, 0, 0);
+    }
+
+    public static Optional<String> roll(ItemStack stack, RandomSource random, int sourceFormId, int sourceBaseFormId, int sourceLevel) {
         if (!isEligible(stack) || hasRollMarker(stack) || BY_ID.isEmpty()) {
             return Optional.empty();
         }
         if (random.nextDouble() >= config.rollChance) {
-            markNoAffix(stack, sourceFormId);
+            markNoAffix(stack, sourceFormId, sourceBaseFormId, sourceLevel);
             SkyCraft.LOG.info("SkyCraft affix: rolled no affix on {}", BuiltInRegistries.ITEM.getKey(stack.getItem()));
             return Optional.empty();
         }
 
         List<AffixDefinition> candidates = candidatesFor(stack);
         if (candidates.isEmpty()) {
-            markNoAffix(stack, sourceFormId);
+            markNoAffix(stack, sourceFormId, sourceBaseFormId, sourceLevel);
             return Optional.empty();
         }
 
         double total = 0.0;
         for (AffixDefinition def : candidates) total += def.weight;
         if (!(total > 0.0)) {
-            markNoAffix(stack, sourceFormId);
+            markNoAffix(stack, sourceFormId, sourceBaseFormId, sourceLevel);
             return Optional.empty();
         }
 
@@ -191,7 +201,7 @@ public final class WeaponAffixes {
         }
         if (chosen == null) chosen = candidates.getFirst();
 
-        apply(stack, chosen, sourceFormId);
+        apply(stack, chosen, sourceFormId, sourceBaseFormId, sourceLevel);
         SkyCraft.LOG.info("SkyCraft affix: rolled {} on {}", chosen.id, BuiltInRegistries.ITEM.getKey(stack.getItem()));
         return Optional.of(chosen.id);
     }
@@ -217,7 +227,7 @@ public final class WeaponAffixes {
         return !stored.isEmpty() && stored.getIntOr("v", 0) == FORMAT;
     }
 
-    private static void markNoAffix(ItemStack stack, int sourceFormId) {
+    private static void markNoAffix(ItemStack stack, int sourceFormId, int sourceBaseFormId, int sourceLevel) {
         CompoundTag root = stack.has(DataComponents.CUSTOM_DATA)
             ? stack.get(DataComponents.CUSTOM_DATA).copyTag()
             : new CompoundTag();
@@ -225,6 +235,8 @@ public final class WeaponAffixes {
         stored.putInt("v", FORMAT);
         stored.putString("id", "none");
         stored.putInt("sourceFormId", sourceFormId);
+        stored.putInt("sourceBaseFormId", sourceBaseFormId);
+        stored.putInt("sourceLevel", sourceLevel);
         root.put(ROOT, stored);
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(root));
     }
@@ -262,6 +274,24 @@ public final class WeaponAffixes {
         return stored.getIntOr("sourceFormId", 0);
     }
 
+    private static int sourceBaseFormId(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return 0;
+        CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
+        if (custom == null) return 0;
+        CompoundTag stored = custom.copyTag().getCompoundOrEmpty(ROOT);
+        if (stored.isEmpty() || stored.getIntOr("v", 0) != FORMAT) return 0;
+        return stored.getIntOr("sourceBaseFormId", 0);
+    }
+
+    private static int sourceLevel(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return 0;
+        CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
+        if (custom == null) return 0;
+        CompoundTag stored = custom.copyTag().getCompoundOrEmpty(ROOT);
+        if (stored.isEmpty() || stored.getIntOr("v", 0) != FORMAT) return 0;
+        return stored.getIntOr("sourceLevel", 0);
+    }
+
     private static Optional<StoredAffix> readStored(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return Optional.empty();
         CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
@@ -279,11 +309,13 @@ public final class WeaponAffixes {
             stored.getDoubleOr("knockbackAdd", 0.0),
             stored.getDoubleOr("procChance", 0.0),
             stored.getDoubleOr("procDamageMultiplier", 1.0),
-            stored.getIntOr("sourceFormId", 0)
+            stored.getIntOr("sourceFormId", 0),
+            stored.getIntOr("sourceBaseFormId", 0),
+            stored.getIntOr("sourceLevel", 0)
         ));
     }
 
-    private static void apply(ItemStack stack, AffixDefinition def, int sourceFormId) {
+    private static void apply(ItemStack stack, AffixDefinition def, int sourceFormId, int sourceBaseFormId, int sourceLevel) {
         ItemAttributeModifiers.Builder attrs = ItemAttributeModifiers.builder();
         for (ItemAttributeModifiers.Entry entry : stack.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY).modifiers()) {
             attrs.add(entry.attribute(), entry.modifier(), entry.slot());
@@ -336,6 +368,8 @@ public final class WeaponAffixes {
         stored.putDouble("procChance", def.procChance);
         stored.putDouble("procDamageMultiplier", def.procDamageMultiplier);
         stored.putInt("sourceFormId", sourceFormId);
+        stored.putInt("sourceBaseFormId", sourceBaseFormId);
+        stored.putInt("sourceLevel", sourceLevel);
         root.put(ROOT, stored);
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(root));
 
@@ -464,7 +498,9 @@ public final class WeaponAffixes {
         double knockbackAdd,
         double procChance,
         double procDamageMultiplier,
-        int sourceFormId
+        int sourceFormId,
+        int sourceBaseFormId,
+        int sourceLevel
     ) {}
 
     public static final class AffixConfig {

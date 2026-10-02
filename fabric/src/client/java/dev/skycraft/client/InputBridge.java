@@ -23,6 +23,8 @@ public final class InputBridge {
 	private static int clickLogs;
 	private static int pendingResourceSourceRequestId;
 	private static int pendingResourceSourceFormId;
+	private static int pendingResourceSourceBaseFormId;
+	private static int pendingResourceSourceLevel;
 
 	private InputBridge() {
 	}
@@ -66,7 +68,7 @@ public final class InputBridge {
 			}
 			case Proto.IN_RELEASE_ALL -> releaseAll();
 			case Proto.IN_HURT -> hurt(minecraft, code, a / 100.0F, b, c);
-			case Proto.IN_RESOURCE_TRANSFER_SOURCE -> rememberResourceSource(a, b);
+			case Proto.IN_RESOURCE_TRANSFER_SOURCE -> rememberResourceSource(a, b, c, code);
 			case Proto.IN_RESOURCE_TRANSFER -> transferResource(minecraft, a, b, c);
 			case Proto.IN_OPEN_MENU -> {
 				if (minecraft.gui.screen() == null && minecraft.player != null) {
@@ -102,9 +104,11 @@ public final class InputBridge {
 	}
 
 
-	private static void rememberResourceSource(int requestId, int sourceFormId) {
+	private static void rememberResourceSource(int requestId, int sourceFormId, int sourceBaseFormId, int sourceLevel) {
 		pendingResourceSourceRequestId = requestId;
 		pendingResourceSourceFormId = sourceFormId;
+		pendingResourceSourceBaseFormId = sourceBaseFormId;
+		pendingResourceSourceLevel = sourceLevel;
 	}
 
 	/** Skyrim acquired a mapped item. Grant it on the authoritative Minecraft server. */
@@ -120,7 +124,7 @@ public final class InputBridge {
 		if (server == null) {
 			if (net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(dev.skycraft.net.SkyNet.ResourceTransfer.TYPE)) {
 				net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
-					new dev.skycraft.net.SkyNet.ResourceTransfer(requestId, itemHash, count, sourceFormId));
+					new dev.skycraft.net.SkyNet.ResourceTransfer(requestId, itemHash, count, sourceFormId, sourceBaseFormId, sourceLevel));
 			} else {
 				resourceAck(requestId, itemHash, 0);
 			}
@@ -130,7 +134,7 @@ public final class InputBridge {
 		var uuid = minecraft.player.getUUID();
 		server.execute(() -> {
 			ServerPlayer player = server.getPlayerList().getPlayer(uuid);
-			int accepted = player != null ? ResourceBridge.grant(player, itemHash, count, sourceFormId) : 0;
+			int accepted = player != null ? ResourceBridge.grant(player, itemHash, count, sourceFormId, sourceBaseFormId, sourceLevel) : 0;
 			resourceAck(requestId, itemHash, accepted);
 		});
 	}

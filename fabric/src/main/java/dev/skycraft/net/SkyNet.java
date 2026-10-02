@@ -54,13 +54,15 @@ public final class SkyNet {
 
 
 	/** Guest -> host: convert a mapped Skyrim item into this guest's real Minecraft inventory. */
-	public record ResourceTransfer(int requestId, int itemHash, int count, int sourceFormId) implements CustomPacketPayload {
+	public record ResourceTransfer(int requestId, int itemHash, int count, int sourceFormId, int sourceBaseFormId, int sourceLevel) implements CustomPacketPayload {
 		public static final Type<ResourceTransfer> TYPE = new Type<>(Identifier.fromNamespaceAndPath(SkyCraft.MOD_ID, "resource_transfer"));
 		public static final StreamCodec<RegistryFriendlyByteBuf, ResourceTransfer> CODEC = StreamCodec.composite(
 			ByteBufCodecs.INT, ResourceTransfer::requestId,
 			ByteBufCodecs.INT, ResourceTransfer::itemHash,
 			ByteBufCodecs.VAR_INT, ResourceTransfer::count,
 			ByteBufCodecs.INT, ResourceTransfer::sourceFormId,
+			ByteBufCodecs.INT, ResourceTransfer::sourceBaseFormId,
+			ByteBufCodecs.VAR_INT, ResourceTransfer::sourceLevel,
 			ResourceTransfer::new
 		);
 
@@ -138,7 +140,7 @@ public final class SkyNet {
 			ServerPlayer player = context.player();
 			int count = Math.max(0, Math.min(payload.count(), 4096));
 			context.server().execute(() -> {
-				int accepted = ResourceBridge.grant(player, payload.itemHash(), count, payload.sourceFormId());
+				int accepted = ResourceBridge.grant(player, payload.itemHash(), count, payload.sourceFormId(), payload.sourceBaseFormId(), payload.sourceLevel());
 				if (ServerPlayNetworking.canSend(player, ResourceTransferAck.TYPE)) {
 					ServerPlayNetworking.send(player,
 						new ResourceTransferAck(payload.requestId(), payload.itemHash(), accepted));
