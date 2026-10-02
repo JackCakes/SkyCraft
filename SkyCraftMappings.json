@@ -501,6 +501,76 @@
       "protectQuestItems": true,
       "ordinaryWeaponOnly": true,
       "enabled": true
+    },
+    {
+      "name": "Steel Dagger",
+      "skyrimFormId": "00013986",
+      "minecraftItem": "skycraft:skyrim_steel_dagger",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Steel Sword",
+      "skyrimFormId": "00013989",
+      "minecraftItem": "skycraft:skyrim_steel_sword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Steel War Axe",
+      "skyrimFormId": "00013983",
+      "minecraftItem": "skycraft:skyrim_steel_war_axe",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Steel Mace",
+      "skyrimFormId": "00013988",
+      "minecraftItem": "skycraft:skyrim_steel_mace",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Steel Greatsword",
+      "skyrimFormId": "00013987",
+      "minecraftItem": "skycraft:skyrim_steel_greatsword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Steel Battleaxe",
+      "skyrimFormId": "00013984",
+      "minecraftItem": "skycraft:skyrim_steel_battleaxe",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Steel Warhammer",
+      "skyrimFormId": "0001398A",
+      "minecraftItem": "skycraft:skyrim_steel_warhammer",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
     }
   ]
 }
