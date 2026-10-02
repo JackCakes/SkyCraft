@@ -40,12 +40,16 @@ public final class RangedMagic {
 
     public static Item FLAMES;
     public static Item FROSTBITE;
+    public static Item SPARKS;
+    public static Item HEALING;
 
     private RangedMagic() {}
 
     public static void init() {
         FLAMES = register("flames", Spell.FLAMES);
         FROSTBITE = register("frostbite", Spell.FROSTBITE);
+        SPARKS = register("sparks", Spell.SPARKS);
+        HEALING = register("healing", Spell.HEALING);
 
         ServerTickEvents.END_SERVER_TICK.register(RangedMagic::idleHandEffects);
 
@@ -55,8 +59,10 @@ public final class RangedMagic {
                     ServerPlayer player = context.getSource().getPlayerOrException();
                     player.getInventory().add(new ItemStack(FLAMES));
                     player.getInventory().add(new ItemStack(FROSTBITE));
+                    player.getInventory().add(new ItemStack(SPARKS));
+                    player.getInventory().add(new ItemStack(HEALING));
                     player.sendSystemMessage(Component.literal(
-                        "SkyCraft magic demo added: Flames + Frostbite. Equip one and hold right-click to channel."));
+                        "SkyCraft magic demo added: Flames, Frostbite, Sparks + Healing. Equip one and hold right-click to channel."));
                     return 1;
                 })));
         });
@@ -105,6 +111,15 @@ public final class RangedMagic {
 
     private static void channelTick(ServerLevel level, ServerPlayer player, Spell spell, int ticksRemaining) {
         Vec3 from = handPosition(player);
+
+        if (spell == Spell.HEALING) {
+            spawnHealing(level, player, from);
+            if (ticksRemaining % 5 == 0 && player.getHealth() < player.getMaxHealth()) {
+                player.heal(0.6F);
+            }
+            return;
+        }
+
         Vec3 aim = player.getLookAngle();
         SkyrimActorEntity target = SkyCombat.findTarget(player, RANGE);
         Vec3 to = target != null
@@ -149,11 +164,15 @@ public final class RangedMagic {
                 if ((player.tickCount & 7) == 0) {
                     level.sendParticles(ParticleTypes.SMOKE, hand.x, hand.y, hand.z, 1, 0.05, 0.05, 0.05, 0.0);
                 }
-            } else {
+            } else if (spell == Spell.FROSTBITE) {
                 level.sendParticles(ParticleTypes.SNOWFLAKE, hand.x, hand.y, hand.z, 2, 0.08, 0.08, 0.08, 0.002);
                 if ((player.tickCount & 7) == 0) {
                     level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 1, 0.04, 0.04, 0.04, 0.0);
                 }
+            } else if (spell == Spell.SPARKS) {
+                level.sendParticles(ParticleTypes.ELECTRIC_SPARK, hand.x, hand.y, hand.z, 2, 0.08, 0.08, 0.08, 0.01);
+            } else {
+                level.sendParticles(ParticleTypes.HEART, hand.x, hand.y, hand.z, 1, 0.08, 0.08, 0.08, 0.0);
             }
         }
     }
@@ -161,6 +180,8 @@ public final class RangedMagic {
     private static Spell spellFor(ItemStack stack) {
         if (stack.is(FLAMES)) return Spell.FLAMES;
         if (stack.is(FROSTBITE)) return Spell.FROSTBITE;
+        if (stack.is(SPARKS)) return Spell.SPARKS;
+        if (stack.is(HEALING)) return Spell.HEALING;
         return null;
     }
 
@@ -193,10 +214,15 @@ public final class RangedMagic {
                 if ((i & 2) == 0) {
                     level.sendParticles(ParticleTypes.SMOKE, p.x, p.y, p.z, 1, spread * 0.6, spread * 0.6, spread * 0.6, 0.002);
                 }
-            } else {
+            } else if (spell == Spell.FROSTBITE) {
                 level.sendParticles(ParticleTypes.SNOWFLAKE, p.x, p.y, p.z, 2, spread, spread, spread, 0.003);
                 if ((i & 3) == 0) {
                     level.sendParticles(ParticleTypes.END_ROD, p.x, p.y, p.z, 1, spread * 0.45, spread * 0.45, spread * 0.45, 0.001);
+                }
+            } else if (spell == Spell.SPARKS) {
+                level.sendParticles(ParticleTypes.ELECTRIC_SPARK, p.x, p.y, p.z, 3, spread, spread, spread, 0.015);
+                if ((i & 3) == 0) {
+                    level.sendParticles(ParticleTypes.END_ROD, p.x, p.y, p.z, 1, spread * 0.35, spread * 0.35, spread * 0.35, 0.002);
                 }
             }
         }
@@ -205,14 +231,25 @@ public final class RangedMagic {
     private static void spawnImpact(ServerLevel level, Vec3 at, Spell spell) {
         if (spell == Spell.FLAMES) {
             level.sendParticles(ParticleTypes.FLAME, at.x, at.y, at.z, 6, 0.22, 0.30, 0.22, 0.02);
-        } else {
+        } else if (spell == Spell.FROSTBITE) {
             level.sendParticles(ParticleTypes.SNOWFLAKE, at.x, at.y, at.z, 8, 0.25, 0.32, 0.25, 0.015);
+        } else if (spell == Spell.SPARKS) {
+            level.sendParticles(ParticleTypes.ELECTRIC_SPARK, at.x, at.y, at.z, 10, 0.24, 0.30, 0.24, 0.025);
         }
+    }
+
+    private static void spawnHealing(ServerLevel level, ServerPlayer player, Vec3 hand) {
+        level.sendParticles(ParticleTypes.HEART, hand.x, hand.y, hand.z, 2, 0.10, 0.10, 0.10, 0.0);
+        level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, 0.12, 0.12, 0.12, 0.005);
+        Vec3 chest = player.position().add(0.0, player.getBbHeight() * 0.62, 0.0);
+        level.sendParticles(ParticleTypes.HEART, chest.x, chest.y, chest.z, 1, 0.18, 0.22, 0.18, 0.0);
     }
 
     public enum Spell {
         FLAMES(0.9F),
-        FROSTBITE(0.7F);
+        FROSTBITE(0.7F),
+        SPARKS(0.8F),
+        HEALING(0.0F);
 
         final float damagePerPulse;
 
