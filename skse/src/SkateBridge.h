@@ -21,6 +21,7 @@ namespace skycraft
 		void WriteSkyState(const skateproto::SkyState& a_state);
 		void WriteInputState(const skateproto::InputState& a_state);
 		bool ReadSkateState(skateproto::SkateState& a_out) const;
+		bool ReadPoseFrame(skateproto::PoseFrame& a_out) const;
 		void SetWorld(std::uint32_t a_worldId) { worldId_.store(a_worldId, std::memory_order_release); }
 
 		void ClearCollision(std::uint32_t a_epoch);
