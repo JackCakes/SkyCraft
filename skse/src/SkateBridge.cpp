@@ -124,20 +124,103 @@ namespace skycraft
 		return false;
 	}
 
-	bool SkateBridge::WriteCollision(skateproto::ColType, const void*, std::uint32_t)
+	bool SkateBridge::WriteCollision(skateproto::ColType a_type, const void* a_payload, std::uint32_t a_bytes)
 	{
-		return false;
+		if (!base_) {
+			return false;
+		}
+
+		auto* ring = base_ + skateproto::kOffCollisionRing;
+		auto& headRef = *reinterpret_cast<std::uint64_t*>(ring + skateproto::kColRingHeadOff);
+		auto& tailRef = *reinterpret_cast<std::uint64_t*>(ring + skateproto::kColRingTailOff);
+		auto* data = ring + skateproto::kColRingDataOff;
+		constexpr auto size = skateproto::kColRingDataBytes;
+
+		const std::uint64_t msgBytes = (sizeof(skateproto::ColMsgHeader) + a_bytes + 7) & ~7ull;
+		if (msgBytes > size / 2) {
+			return false;
+		}
+
+		auto head = Atomic(headRef).load(std::memory_order_relaxed);
+		const auto tail = Atomic(tailRef).load(std::memory_order_acquire);
+		auto pos = head % size;
+		const auto padBytes = (pos + msgBytes > size) ? size - pos : 0;
+		if (size - (head - tail) < msgBytes + padBytes) {
+			return false;
+		}
+
+		if (padBytes) {
+			*reinterpret_cast<skateproto::ColMsgHeader*>(data + pos) = { skateproto::kColPad, 0 };
+			head += padBytes;
+			pos = 0;
+		}
+
+		*reinterpret_cast<skateproto::ColMsgHeader*>(data + pos) = { a_type, a_bytes };
+		if (a_bytes) {
+			std::memcpy(data + pos + sizeof(skateproto::ColMsgHeader), a_payload, a_bytes);
+		}
+		Atomic(headRef).store(head + msgBytes, std::memory_order_release);
+		return true;
 	}
 
-	void SkateBridge::ClearCollision(std::uint32_t)
-	{}
+	void SkateBridge::ClearCollision(std::uint32_t a_epoch)
+	{
+		if (!Valid()) {
+			return;
+		}
+		for (int attempt = 0; attempt < 100; ++attempt) {
+			if (WriteCollision(skateproto::kColClear, &a_epoch, sizeof(a_epoch))) {
+				return;
+			}
+			std::this_thread::sleep_for(1ms);
+		}
+		logger::warn("Skate bridge: collision ring full; dropped clear epoch {}", a_epoch);
+	}
 
 	void SkateBridge::WriteRegion(
-		std::int32_t,
-		std::int32_t,
-		std::int32_t,
-		std::uint32_t,
-		const proto::ColTri*,
-		std::uint32_t)
-	{}
+		std::int32_t a_rx,
+		std::int32_t a_ry,
+		std::int32_t a_rz,
+		std::uint32_t a_epoch,
+		const proto::ColTri* a_tris,
+		std::uint32_t a_count)
+	{
+		if (!Valid()) {
+			return;
+		}
+
+		skateproto::ColRegion header{};
+		header.rx = a_rx;
+		header.ry = a_ry;
+		header.rz = a_rz;
+		header.count = a_count;
+		header.epoch = a_epoch;
+		header.worldId = worldId_.load(std::memory_order_acquire);
+
+		std::vector<std::uint8_t> payload(sizeof(header) + std::size_t(a_count) * sizeof(skateproto::ColTri));
+		std::memcpy(payload.data(), &header, sizeof(header));
+		if (a_count) {
+			static_assert(sizeof(proto::ColTri) == sizeof(skateproto::ColTri));
+			std::memcpy(
+				payload.data() + sizeof(header),
+				a_tris,
+				std::size_t(a_count) * sizeof(skateproto::ColTri));
+		}
+
+		for (int attempt = 0; attempt < 100; ++attempt) {
+			if (WriteCollision(
+					skateproto::kColRegionTris,
+					payload.data(),
+					static_cast<std::uint32_t>(payload.size()))) {
+				return;
+			}
+			std::this_thread::sleep_for(1ms);
+		}
+		logger::warn(
+			"Skate bridge: collision ring full; dropped region ({},{},{}) epoch {}",
+			a_rx,
+			a_ry,
+			a_rz,
+			a_epoch);
+	}
 }
