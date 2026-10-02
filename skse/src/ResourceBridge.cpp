@@ -67,9 +67,9 @@ namespace skycraft::ResourceBridge
 		}
 
 		template <class... Args>
-		void BridgeInfo(fmt::format_string<Args...> a_format, Args... a_args)
+		void BridgeInfo(fmt::format_string<Args...> a_format, Args&&... a_args)
 		{
-			const auto message = fmt::format(a_format, a_args...);
+			const auto message = fmt::format(a_format, std::forward<Args>(a_args)...);
 			logger::info("{}", message);
 			if (progressionLog) {
 				progressionLog->info("{}", message);
@@ -77,9 +77,9 @@ namespace skycraft::ResourceBridge
 		}
 
 		template <class... Args>
-		void BridgeWarn(fmt::format_string<Args...> a_format, Args... a_args)
+		void BridgeWarn(fmt::format_string<Args...> a_format, Args&&... a_args)
 		{
-			const auto message = fmt::format(a_format, a_args...);
+			const auto message = fmt::format(a_format, std::forward<Args>(a_args)...);
 			logger::warn("{}", message);
 			if (progressionLog) {
 				progressionLog->warn("{}", message);
@@ -87,9 +87,9 @@ namespace skycraft::ResourceBridge
 		}
 
 		template <class... Args>
-		void BridgeError(fmt::format_string<Args...> a_format, Args... a_args)
+		void BridgeError(fmt::format_string<Args...> a_format, Args&&... a_args)
 		{
-			const auto message = fmt::format(a_format, a_args...);
+			const auto message = fmt::format(a_format, std::forward<Args>(a_args)...);
 			logger::error("{}", message);
 			if (progressionLog) {
 				progressionLog->error("{}", message);
