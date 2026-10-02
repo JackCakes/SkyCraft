@@ -43,13 +43,25 @@ numbers already baked into their ItemStack.
 `/skyaffixes testkit`
 
 adds 12 independently rolled SkyCraft Iron Swords. This is only a development command. Inspect names,
-lore, attack speed/reach/damage, and durability. With enough Volatile swords/hits the log should show:
+lore, attack speed/reach/damage, and durability.
+
+For deterministic testing, use:
+
+`/skyaffixes give brutal`
+`/skyaffixes give swift`
+`/skyaffixes give long`
+`/skyaffixes give sturdy`
+`/skyaffixes give volatile`
+
+Hold an affixed weapon and run `/skyaffixes inspect` to print the exact stored values. With a Volatile
+weapon, enough hits should eventually make the log show:
 
 `SkyCraft affix proc: 3.0x damage on <actor>`
 
 ## Safety / scope
 
-- Existing affixed stacks are never rerolled by the grant path.
+- Every weapon is rolled exactly once. A failed affix roll is also marked, so a normal weapon cannot later reroll itself into a bonus.
+- Runtime proc numbers are copied into the weapon's own custom data when it rolls. Editing/reloading the config changes future drops only; existing Volatile/etc. weapons keep the behavior they originally rolled.
 - No ESP/ESL, Papyrus state, Skyrim save records or SKSE co-save data are added.
 - One affix per weapon for prototype 1.
 - No life-steal, status effects, elemental procs, rarity tiers or multi-affix combinations yet.
