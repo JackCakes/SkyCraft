@@ -1,0 +1,46 @@
+name: Build progression bridge
+
+on:
+  push:
+    branches:
+      - feature/skyrim-minecraft-progression
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out SkyCraft
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up vcpkg
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://github.com/microsoft/vcpkg .tools/vcpkg
+          .\.tools\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Build and package MO2 release
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File tools\package.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Upload MO2-ready build
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkyCraft-progression-bridge
+          path: |
+            dist/SkyCraft-*.zip
+            dist/skycraft-fabric-*.jar
+          if-no-files-found: error
