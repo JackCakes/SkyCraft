@@ -165,7 +165,9 @@ namespace skycraft
 
 	void SkateBridge::ClearCollision(std::uint32_t a_epoch)
 	{
-		if (!Valid()) {
+		// The bridge is optional. Never let an absent host back-pressure SkyCraft's
+		// existing Minecraft collision worker.
+		if (!Valid() || !HostAlive()) {
 			return;
 		}
 		for (int attempt = 0; attempt < 100; ++attempt) {
@@ -185,7 +187,9 @@ namespace skycraft
 		const proto::ColTri* a_tris,
 		std::uint32_t a_count)
 	{
-		if (!Valid()) {
+		// The bridge is optional. Until a host is actually consuming the ring,
+		// drop Skate copies immediately rather than filling the ring and sleeping.
+		if (!Valid() || !HostAlive()) {
 			return;
 		}
 
