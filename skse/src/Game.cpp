@@ -1133,6 +1133,19 @@ namespace skycraft
 			skateSky.requestedMode = skateRequested ? skateproto::kModeSkate : skateproto::kModeMinecraft;
 			skateBridge.WriteSkyState(skateSky);
 
+			skateproto::InputState skateInput{};
+			Input::SampleSkateInput(skateInput, a_delta);
+			if (menu || loading || !skateRequested) {
+				// Keep packet timing alive, but publish a neutral controller whenever
+				// the Skate host is not allowed to act on player input.
+				skateInput.flags = menu || loading ? 0u : skateInput.flags;
+				skateInput.buttons = 0;
+				skateInput.triggers[0] = skateInput.triggers[1] = 0;
+				skateInput.left[0] = skateInput.left[1] = 0;
+				skateInput.right[0] = skateInput.right[1] = 0;
+			}
+			skateBridge.WriteInputState(skateInput);
+
 			settleTimer -= a_delta;
 			if (haveMc && !loading && cell && settleTimer <= 0.0f) {
 				Perf::Scope timer(Perf::kCollision);
