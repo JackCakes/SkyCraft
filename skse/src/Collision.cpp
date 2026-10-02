@@ -1,6 +1,7 @@
 #include "Collision.h"
 
 #include "Dig.h"
+#include "SkateBridge.h"
 
 namespace skycraft
 {
@@ -677,6 +678,7 @@ namespace skycraft
 					std::vector<std::uint8_t> payload(4);
 					std::memcpy(payload.data(), &job.epoch, 4);
 					Send(payload, proto::kColClear);
+					SkateBridge::Get().ClearCollision(job.epoch);
 				} else if (job.epoch == epoch_.load()) {
 					SendTriangles(job);
 					Voxelize(job);
@@ -932,6 +934,13 @@ namespace skycraft
 			std::memcpy(payload.data() + sizeof(header), out.data(), out.size() * sizeof(proto::ColTri));
 		}
 		Send(payload, proto::kColTris);
+		SkateBridge::Get().WriteRegion(
+			a_job.rx,
+			a_job.ry,
+			a_job.rz,
+			a_job.epoch,
+			out.data(),
+			static_cast<std::uint32_t>(out.size()));
 	}
 
 	void Collision::Voxelize(const Job& a_job)

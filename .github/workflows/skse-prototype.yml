@@ -1,0 +1,53 @@
+name: SKSE prototype build
+
+on:
+  push:
+    branches: ["feature/skate-bridge"]
+
+concurrency:
+  group: skse-prototype-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  skse:
+    runs-on: windows-2025-vs2026
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://github.com/microsoft/vcpkg .tools/vcpkg
+          .\.tools\vcpkg\bootstrap-vcpkg.bat
+
+      - name: Configure SKSE
+        shell: pwsh
+        working-directory: skse
+        run: |
+          for ($attempt = 1; $attempt -le 5; $attempt++) {
+            cmake --preset default
+            if ($LASTEXITCODE -eq 0) {
+              exit 0
+            }
+            if ($attempt -lt 5) {
+              $delay = 10 * $attempt
+              Write-Host "Configure failed (attempt $attempt/5); retrying transient dependency downloads in $delay seconds..."
+              Start-Sleep -Seconds $delay
+            }
+          }
+          exit 1
+
+      - name: Build SKSE
+        working-directory: skse
+        run: cmake --build --preset release
+
+      - name: Upload prototype DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkyCraft-SkateBridge-SKSE
+          path: |
+            skse/build/RelWithDebInfo/SkyCraft.dll
+            skse/build/RelWithDebInfo/SkyCraft.pdb
+          if-no-files-found: error

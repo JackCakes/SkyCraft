@@ -1,5 +1,6 @@
 #include "Dig.h"
 #include "Game.h"
+#include "SkateBridge.h"
 
 namespace
 {
@@ -25,6 +26,9 @@ namespace
 			if (!skycraft::Link::Get().Create()) {
 				logger::error("SkyCraft disabled: could not create shared memory");
 				return;
+			}
+			if (!skycraft::SkateBridge::Get().Create()) {
+				logger::warn("Skate bridge disabled: could not create optional shared memory");
 			}
 			skycraft::Game::Install();
 			skycraft::Input::Install();

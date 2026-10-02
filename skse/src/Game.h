@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Link.h"
+#include "skycraft_skate_protocol.h"
 
 namespace skycraft
 {
@@ -13,6 +14,10 @@ namespace skycraft
 		// The same, or waiting for Minecraft to arrive after a teleport: Skyrim's own controls
 		// don't move its player either way (it would wander off from where Minecraft is going).
 		std::atomic<bool> minecraftOwnsPlayer{ false };
+		// The external Skate host is currently driving the Skyrim player. This is
+		// separate from puppeting so Minecraft input can be released while Skyrim's
+		// own movement controls remain suppressed during the handoff.
+		std::atomic<bool> skateOwnsPlayer{ false };
 		// A Minecraft GUI screen (inventory, chat, ...) is open: mouse moves MC's cursor.
 		std::atomic<bool> mcScreenOpen{ false };
 		// A Skyrim menu (journal, dialogue, console, loading, ...) owns input.
@@ -100,6 +105,11 @@ namespace skycraft
 		void ConsumeLook(float& a_dx, float& a_dy);
 		// Tells MC to release everything (input focus moved to Skyrim).
 		void ReleaseAll();
+		// Snapshot the keyboard fallback in the XInput-shaped Skate protocol.
+		// WASD = left stick, arrows = right stick, Q/E = analog triggers,
+		// Space/Ctrl/Shift/R = A/B/X/Y. This is diagnostic plumbing; the raw
+		// protocol also supports a real controller later without changing ABI.
+		void SampleSkateInput(skateproto::InputState& a_out, float a_frameSeconds);
 	}
 
 	namespace Input

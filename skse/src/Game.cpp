@@ -3,6 +3,7 @@
 #include "Collision.h"
 #include "Dig.h"
 #include "Perf.h"
+#include "SkateBridge.h"
 
 namespace skycraft
 {
@@ -94,6 +95,9 @@ namespace skycraft
 		// before then sends empty regions, so wait for the world to settle first.
 		float          settleTimer = 2.0f;
 		constexpr float kSettleSeconds = 1.5f;
+		// F6 requests the experimental external Skate authority. The request is
+		// deliberately process-local and never saved into Skyrim.
+		bool           skateRequested = false;
 
 		RE::NiPoint3      eyePos{};
 		// Meshes of Skyrim's first-person model we hid for Minecraft's third-person camera.
@@ -174,6 +178,49 @@ namespace skycraft
 			RE::NiMatrix3 m;
 			for (int i = 0; i < 3; ++i) {
 				const float fv[3] = { f.x, f.y, f.z }, uv[3] = { u.x, u.y, u.z }, rv[3] = { r.x, r.y, r.z };
+				m.entry[i][0] = fv[i];
+				m.entry[i][1] = uv[i];
+				m.entry[i][2] = rv[i];
+			}
+			return m;
+		}
+
+		float SkateRootToMcYaw(const float a_quat[4])
+		{
+			float x = a_quat[0], y = a_quat[1], z = a_quat[2], w = a_quat[3];
+			const float len = std::sqrt(x * x + y * y + z * z + w * w);
+			if (!std::isfinite(len) || len < 1.0e-6f) {
+				return 0.0f;
+			}
+			x /= len, y /= len, z /= len, w /= len;
+			// Session/MC space is Y-up. Positive right-handed Y rotation turns
+			// +Z toward +X, while Minecraft yaw increases from +Z toward -X.
+			const float sinHeading = 2.0f * (w * y + x * z);
+			const float cosHeading = 1.0f - 2.0f * (y * y + z * z);
+			const float sessionHeading = std::atan2(sinHeading, cosHeading);
+			float mcYaw = -sessionHeading * kRadToDeg;
+			if (mcYaw < 0.0f) {
+				mcYaw += 360.0f;
+			}
+			return mcYaw;
+		}
+
+		RE::NiMatrix3 CameraBasisFromMc(const float a_forward[3], const float a_up[3])
+		{
+			auto normalize = [](RE::NiPoint3 a_v) {
+				const float len = a_v.Length();
+				return len > 1.0e-5f ? a_v * (1.0f / len) : RE::NiPoint3{};
+			};
+			// MC-space is X east, Y up, Z south. Skyrim is X east, Y north, Z up.
+			RE::NiPoint3 f = normalize({ a_forward[0], -a_forward[2], a_forward[1] });
+			RE::NiPoint3 u = normalize({ a_up[0], -a_up[2], a_up[1] });
+			RE::NiPoint3 r = normalize(f.Cross(u));
+			u = normalize(r.Cross(f));
+			RE::NiMatrix3 m{};
+			const float fv[3] = { f.x, f.y, f.z };
+			const float uv[3] = { u.x, u.y, u.z };
+			const float rv[3] = { r.x, r.y, r.z };
+			for (int i = 0; i < 3; ++i) {
 				m.entry[i][0] = fv[i];
 				m.entry[i][1] = uv[i];
 				m.entry[i][2] = rv[i];
@@ -539,6 +586,29 @@ namespace skycraft
 				teleportPending = true;
 			}
 			mcWasAlive = mcAlive;
+
+			// The Skate host is optional and may be started after Skyrim. When a new host
+			// appears, bump the shared collision epoch so it receives a complete fresh set
+			// of exact Havok regions instead of only the regions that happen to refresh.
+			auto& skateBridge = SkateBridge::Get();
+			static bool          skateHostWasAlive = false;
+			static std::uint32_t lastSkateHostPid = 0;
+			const bool           skateHostAlive = skateBridge.HostAlive();
+			const auto           skateHostPid = skateBridge.HostPid();
+			const bool           newSkateHost = skateHostAlive && skateHostPid != 0 && skateHostPid != lastSkateHostPid;
+			if (skateHostAlive) {
+				lastSkateHostPid = skateHostPid;
+			}
+			if (skateHostAlive && (!skateHostWasAlive || newSkateHost)) {
+				logger::info("Skate host connected; resending collision");
+				++epoch;
+				Collision::Get().Reset(epoch);
+			}
+			if (!skateHostAlive && skateHostWasAlive) {
+				logger::info("Skate host disconnected; SkyCraft continues normally");
+			}
+			skateHostWasAlive = skateHostAlive;
+
 			st.mcInWorld = haveMc && (mc.flags & proto::kMcInWorld);
 			const bool screenOpen = haveMc && (mc.flags & proto::kMcScreenOpen);
 			if (screenOpen && !st.mcScreenOpen) {
@@ -553,10 +623,32 @@ namespace skycraft
 			auto*      cell = a_player->GetParentCell();
 			const bool loading = !cell || !a_player->Is3DLoaded() || ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME);
 			const bool menu = AnyBlockingMenuOpen(ui);
-			if ((menu || loading) && !st.skyrimMenuOpen) {
+			const bool menuWasOpen = st.skyrimMenuOpen.load();
+			if ((menu || loading) && !menuWasOpen) {
 				Input::ReleaseAll();
 			}
+			// A pausing menu can stop this per-frame update after the input sink has
+			// already marked it open. If Skate authority was requested, treat that
+			// observation as a hard preemption when the game thread resumes.
+			if (menuWasOpen && skateRequested) {
+				logger::info("Skate mode cancelled because a Skyrim menu took focus");
+				skateRequested = false;
+				teleportPending = true;
+			}
 			st.skyrimMenuOpen = menu || loading;
+
+			if (!menu && !loading && (::GetAsyncKeyState(VK_F6) & 1)) {
+				skateRequested = !skateRequested;
+				if (!skateRequested) {
+					// The next normal SkyCraft frame sends Minecraft to wherever the
+					// host left Skyrim instead of snapping Skyrim back to old MC state.
+					teleportPending = true;
+				}
+				logger::info(
+					"Skate mode requested {} (host {})",
+					skateRequested ? "on" : "off",
+					skateBridge.HostAlive() ? "connected" : "not connected");
+			}
 
 			// World identity: exterior worldspace or interior cell. A change wipes MC's collision.
 			if (cell) {
@@ -574,7 +666,7 @@ namespace skycraft
 			}
 
 			// Skyrim moved the player itself (load door, fast travel, script, loading a save).
-			const auto current = a_player->GetPosition();
+			auto current = a_player->GetPosition();
 			if (loading) {
 				teleportPending = true;
 				haveLastSet = false;
@@ -621,7 +713,107 @@ namespace skycraft
 				}
 			}
 			takeover = takeoverNow;
-			const bool arriving = haveMc && st.mcInWorld && !loading && mc.teleportAck != teleportSeq && !takeover;
+
+			// Read the host's previous-frame output before deciding who owns movement.
+			// Authority is granted only after the host explicitly says ACTIVE and its
+			// target pose is finite and close to Skyrim's current player. This makes a
+			// stale/corrupt host state fail closed to normal SkyCraft.
+			skateproto::SkateState skateState{};
+			const bool haveSkateState = skateHostAlive && skateBridge.ReadSkateState(skateState);
+			const bool skatePoseFinite =
+				haveSkateState &&
+				std::isfinite(skateState.x) && std::isfinite(skateState.y) && std::isfinite(skateState.z) &&
+				std::isfinite(skateState.quat[0]) && std::isfinite(skateState.quat[1]) &&
+				std::isfinite(skateState.quat[2]) && std::isfinite(skateState.quat[3]);
+			const auto currentMc = SkyToMc(current);
+			const double skateGap = skatePoseFinite ?
+				std::sqrt(
+					(skateState.x - currentMc.x) * (skateState.x - currentMc.x) +
+					(skateState.y - currentMc.y) * (skateState.y - currentMc.y) +
+					(skateState.z - currentMc.z) * (skateState.z - currentMc.z)) :
+				std::numeric_limits<double>::infinity();
+			const bool skateCameraFinite =
+				haveSkateState &&
+				std::isfinite(skateState.cameraPos[0]) && std::isfinite(skateState.cameraPos[1]) && std::isfinite(skateState.cameraPos[2]) &&
+				std::isfinite(skateState.cameraForward[0]) && std::isfinite(skateState.cameraForward[1]) && std::isfinite(skateState.cameraForward[2]) &&
+				std::isfinite(skateState.cameraUp[0]) && std::isfinite(skateState.cameraUp[1]) && std::isfinite(skateState.cameraUp[2]) &&
+				std::isfinite(skateState.fovDeg) && skateState.fovDeg > 1.0f && skateState.fovDeg < 179.0f;
+			const bool skateHostActive =
+				skatePoseFinite &&
+				(skateState.flags & skateproto::kHostReady) != 0 &&
+				(skateState.flags & skateproto::kHostActive) != 0 &&
+				(skateState.flags & skateproto::kHostError) == 0;
+			const bool skateAuthority =
+				skateRequested && skateHostActive && skateGap <= 2.0 &&
+				!loading && !menu && !a_player->IsDead() && !takeover;
+
+			static bool skateWasActive = false;
+			const bool skateReleaseThisFrame = skateWasActive && !skateAuthority;
+			if (!skateWasActive && skateAuthority) {
+				Input::ReleaseAll();
+				logger::info(
+					"Skate synthetic authority acquired at ({:.3f}, {:.3f}, {:.3f})",
+					skateState.x, skateState.y, skateState.z);
+			}
+			if (skateWasActive && !skateAuthority) {
+				const char* reason =
+					!skateRequested ? "requested off" :
+					!skateHostAlive ? "host disconnected" :
+					(skateState.flags & skateproto::kHostError) ? "host error" :
+					!skatePoseFinite ? "invalid host pose" :
+					skateGap > 2.0 ? "host pose exceeded safety radius" :
+					(menu || loading) ? "menu/loading" :
+					a_player->IsDead() ? "player death" :
+					takeover ? "Skyrim takeover" : "host inactive";
+				logger::info("Skate synthetic authority released ({})", reason);
+				skateRequested = false;
+				teleportPending = true;
+				Input::ReleaseAll();
+			}
+			skateWasActive = skateAuthority;
+			st.skateOwnsPlayer = skateAuthority;
+
+			// The real Skate Session publishes a named skeletal pose separately from
+			// the small root/camera state. Validate that channel now, but do not
+			// retarget it onto Skyrim's skeleton until the rig mapping is ready.
+			if (skateAuthority) {
+				skateproto::PoseFrame poseFrame{};
+				if (skateBridge.ReadPoseFrame(poseFrame) &&
+					(poseFrame.flags & skateproto::kPoseValid) != 0 &&
+					poseFrame.boneCount > 0 &&
+					poseFrame.boneCount <= skateproto::kMaxPoseBones) {
+					bool finitePose = true;
+					for (std::uint32_t b = 0; b < poseFrame.boneCount && finitePose; ++b) {
+						if (poseFrame.bones[b].nameHash == 0) {
+							finitePose = false;
+							break;
+						}
+						for (float v : poseFrame.bones[b].matrix) {
+							if (!std::isfinite(v)) {
+								finitePose = false;
+								break;
+							}
+						}
+					}
+					static std::uint32_t loggedPoseSet = 0;
+					if (finitePose && poseFrame.nameSetId != loggedPoseSet) {
+						loggedPoseSet = poseFrame.nameSetId;
+						logger::info(
+							"Skate pose transport ready: {} bones, name set {:08X}, tick {}",
+							poseFrame.boneCount,
+							poseFrame.nameSetId,
+							poseFrame.tick);
+					} else if (!finitePose) {
+						static bool warnedBadPose = false;
+						if (!warnedBadPose) {
+							warnedBadPose = true;
+							logger::warn("Skate pose frame contained invalid bone data; ignoring animation frame");
+						}
+					}
+				}
+			}
+
+			const bool arriving = haveMc && st.mcInWorld && !loading && mc.teleportAck != teleportSeq && !takeover && !skateAuthority && !skateReleaseThisFrame;
 			if (arriving) {
 				const auto   here = SkyToMc(current);
 				const double gap = std::sqrt((here.x - mc.x) * (here.x - mc.x) + (here.y - mc.y) * (here.y - mc.y) + (here.z - mc.z) * (here.z - mc.z));
@@ -636,8 +828,11 @@ namespace skycraft
 			}
 
 			// A dead Skyrim player gets Skyrim's own death camera and reload.
-			const bool puppet = haveMc && st.mcInWorld && mc.teleportAck == teleportSeq && !loading && !a_player->IsDead() && !takeover;
-			st.minecraftOwnsPlayer = puppet || (arriving && !a_player->IsDead());
+			const bool puppet = haveMc && st.mcInWorld && mc.teleportAck == teleportSeq && !loading && !a_player->IsDead() && !takeover && !skateAuthority && !skateReleaseThisFrame;
+			// Keep Skyrim controls suppressed for the one hand-back frame as well.
+			// The next frame processes teleportPending and Minecraft acknowledges the
+			// host's final position through the normal SkyCraft teleport handshake.
+			st.minecraftOwnsPlayer = skateReleaseThisFrame || puppet || (arriving && !a_player->IsDead());
 			if (puppet != st.puppeting) {
 				logger::info("puppet {}", puppet ? "on (Minecraft drives the player)" : "off");
 			}
@@ -648,7 +843,7 @@ namespace skycraft
 				SyncSneak(a_player, (mc.flags & proto::kMcSneaking) != 0, a_delta);
 			}
 			if (ui) {
-				HideCrosshair(ui, puppet, a_player->AsActorState()->actorState1.sneaking);
+				HideCrosshair(ui, puppet || skateAuthority, a_player->AsActorState()->actorState1.sneaking);
 			}
 			st.mcCrosshair = puppet && mc.cameraMode == 0 && !st.mcScreenOpen && !st.skyrimMenuOpen;
 			st.mcGuiScale = haveMc ? static_cast<int>(mc.guiScale) : 0;
@@ -785,7 +980,55 @@ namespace skycraft
 				motion.frameMsMax = std::max(motion.frameMsMax, frameMs);
 			}
 
-			if (puppet) {
+			if (skateAuthority) {
+				const auto pos = McToSky(skateState.x, skateState.y, skateState.z);
+				a_player->SetPosition(pos, true);
+				if (auto* controller = a_player->GetCharController()) {
+					controller->SetLinearVelocityImpl(RE::hkVector4(0.0f, 0.0f, 0.0f, 0.0f));
+					controller->fallStartHeight = pos.z;
+					controller->fallTime = 0.0f;
+				}
+				lastSetPos = pos;
+				haveLastSet = true;
+				current = pos;
+				const float skateYaw = SkateRootToMcYaw(skateState.quat);
+				st.yaw = skateYaw;
+				a_player->data.angle.z = McYawToHeading(skateYaw);
+				st.feetX = skateState.x;
+				st.feetY = skateState.y;
+				st.feetZ = skateState.z;
+				st.feetValid = true;
+				HideFirstPersonMeshes(a_player, true);
+
+				const bool hostCamera =
+					(skateState.flags & skateproto::kHostCameraValid) != 0 && skateCameraFinite && rotValidated;
+				if (hostCamera) {
+					eyePos = McToSky(
+						skateState.cameraPos[0],
+						skateState.cameraPos[1],
+						skateState.cameraPos[2]);
+					eyeValid = true;
+					idealRot = CameraBasisFromMc(skateState.cameraForward, skateState.cameraUp);
+					idealRotNoRoll = idealRot;
+					idealValid = !st.skyrimMenuOpen && rotValidated;
+					if (auto* camera = RE::PlayerCamera::GetSingleton(); camera && camera->cameraRoot) {
+						if (!camera->IsInFirstPerson()) {
+							camera->ForceFirstPerson();
+						}
+						auto* root = camera->cameraRoot.get();
+						if (idealValid) {
+							ApplyLookRotation(root);
+						}
+						PinCameraAndSky();
+						ApplyMcFov(camera, skateState.fovDeg);
+						RE::NiUpdateData update{};
+						root->UpdateDownwardPass(update, 0);
+					}
+				} else {
+					eyeValid = false;
+					idealValid = false;
+				}
+			} else if (puppet) {
 				const auto pos = McToSky(feetX, feetY, feetZ);
 				a_player->SetPosition(pos, true);
 				if (auto* controller = a_player->GetCharController()) {
@@ -971,7 +1214,7 @@ namespace skycraft
 			hudTimer -= a_delta;
 			if (hudTimer <= 0.0f) {
 				hudTimer = 0.5f;
-				HideHud(ui, puppet);
+				HideHud(ui, puppet || skateAuthority);
 			}
 
 			// Tell Minecraft where Skyrim's player is and where they're looking.
@@ -992,6 +1235,40 @@ namespace skycraft
 				sky.gameHour = calendar->GetHour();
 			}
 			link.WriteSkyState(sky);
+
+			// Publish the current world/player frame to the external host. When F6
+			// requests Skate mode, the host may reply with kHostActive; movement
+			// authority is accepted on the following frame only after the checks above.
+			skateBridge.SetWorld(worldId);
+			skateproto::SkyState skateSky{};
+			skateSky.flags = (cell ? skateproto::kSkyInGame : 0u) |
+			                 (menu ? skateproto::kSkyMenuOpen : 0u) |
+			                 (loading ? skateproto::kSkyLoading : 0u);
+			skateSky.worldId = worldId;
+			skateSky.collisionEpoch = epoch;
+			skateSky.x = skyMc.x;
+			skateSky.y = skyMc.y;
+			skateSky.z = skyMc.z;
+			skateSky.yaw = st.yaw;
+			skateSky.viewportW = sky.viewportW;
+			skateSky.viewportH = sky.viewportH;
+			skateSky.aspect = static_cast<float>(sky.viewportW) /
+			                  static_cast<float>(std::max<std::uint32_t>(sky.viewportH, 1));
+			skateSky.requestedMode = skateRequested ? skateproto::kModeSkate : skateproto::kModeMinecraft;
+			skateBridge.WriteSkyState(skateSky);
+
+			skateproto::InputState skateInput{};
+			Input::SampleSkateInput(skateInput, a_delta);
+			if (menu || loading || !skateRequested) {
+				// Keep packet timing alive, but publish a neutral controller whenever
+				// the Skate host is not allowed to act on player input.
+				skateInput.flags = menu || loading ? 0u : skateInput.flags;
+				skateInput.buttons = 0;
+				skateInput.triggers[0] = skateInput.triggers[1] = 0;
+				skateInput.left[0] = skateInput.left[1] = 0;
+				skateInput.right[0] = skateInput.right[1] = 0;
+			}
+			skateBridge.WriteInputState(skateInput);
 
 			settleTimer -= a_delta;
 			if (haveMc && !loading && cell && settleTimer <= 0.0f) {
