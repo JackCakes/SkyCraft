@@ -3,6 +3,7 @@
 #include "Collision.h"
 #include "Dig.h"
 #include "Perf.h"
+#include "SkateBridge.h"
 
 namespace skycraft
 {
@@ -992,6 +993,35 @@ namespace skycraft
 				sky.gameHour = calendar->GetHour();
 			}
 			link.WriteSkyState(sky);
+
+			// Experimental Skate bridge: publish the same world/player frame to the Rust host.
+			// This does not take movement authority yet; it only validates transport safely.
+			auto& skate = SkateBridge::Get();
+			skate.SetWorld(worldId);
+			static bool skateRequested = false;
+			if (!menu && !loading && (::GetAsyncKeyState(VK_F6) & 1)) {
+				skateRequested = !skateRequested;
+				logger::info(
+					"Skate mode requested {} (host {})",
+					skateRequested ? "on" : "off",
+					skate.HostAlive() ? "connected" : "not connected");
+			}
+			skateproto::SkyState skateSky{};
+			skateSky.flags = (cell ? skateproto::kSkyInGame : 0u) |
+			                 (menu ? skateproto::kSkyMenuOpen : 0u) |
+			                 (loading ? skateproto::kSkyLoading : 0u);
+			skateSky.worldId = worldId;
+			skateSky.collisionEpoch = epoch;
+			skateSky.x = skyMc.x;
+			skateSky.y = skyMc.y;
+			skateSky.z = skyMc.z;
+			skateSky.yaw = st.yaw;
+			skateSky.viewportW = sky.viewportW;
+			skateSky.viewportH = sky.viewportH;
+			skateSky.aspect = static_cast<float>(sky.viewportW) /
+			                  static_cast<float>(std::max<std::uint32_t>(sky.viewportH, 1));
+			skateSky.requestedMode = skateRequested ? skateproto::kModeSkate : skateproto::kModeMinecraft;
+			skate.WriteSkyState(skateSky);
 
 			settleTimer -= a_delta;
 			if (haveMc && !loading && cell && settleTimer <= 0.0f) {
