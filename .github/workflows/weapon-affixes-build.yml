@@ -6,6 +6,10 @@ on:
       - experimental/weapon-affixes
   workflow_dispatch:
 
+concurrency:
+  group: weapon-affixes-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: windows-2025-vs2026
