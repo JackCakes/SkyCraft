@@ -54,7 +54,7 @@ public final class SkyCraftClient implements ClientModInitializer {
 			}
 		});
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(dev.skycraft.net.SkyNet.ResourceTransferAck.TYPE, (payload, context) -> {
-			InputBridge.resourceAck(payload.requestId(), payload.kind(), payload.skyrimFormId(), payload.accepted());
+			InputBridge.resourceAck(payload.requestId(), payload.itemHash(), payload.accepted());
 		});
 		// Skyrim draws the real NPC; its Minecraft stand-in is only a hitbox.
 		EntityRendererRegistry.register(SkyCombat.SKYRIM_ACTOR, NoopRenderer::new);

@@ -53,14 +53,13 @@ public final class SkyNet {
 	}
 
 
-	/** Guest -> host: convert a Skyrim resource into this guest's real Minecraft inventory. */
-	public record ResourceTransfer(int requestId, int kind, int count, int skyrimFormId) implements CustomPacketPayload {
+	/** Guest -> host: convert a mapped Skyrim item into this guest's real Minecraft inventory. */
+	public record ResourceTransfer(int requestId, int itemHash, int count) implements CustomPacketPayload {
 		public static final Type<ResourceTransfer> TYPE = new Type<>(Identifier.fromNamespaceAndPath(SkyCraft.MOD_ID, "resource_transfer"));
 		public static final StreamCodec<RegistryFriendlyByteBuf, ResourceTransfer> CODEC = StreamCodec.composite(
 			ByteBufCodecs.INT, ResourceTransfer::requestId,
-			ByteBufCodecs.VAR_INT, ResourceTransfer::kind,
+			ByteBufCodecs.INT, ResourceTransfer::itemHash,
 			ByteBufCodecs.VAR_INT, ResourceTransfer::count,
-			ByteBufCodecs.INT, ResourceTransfer::skyrimFormId,
 			ResourceTransfer::new
 		);
 
@@ -70,14 +69,13 @@ public final class SkyNet {
 		}
 	}
 
-	/** Host -> guest: how many requested resources were actually accepted by Minecraft. */
-	public record ResourceTransferAck(int requestId, int kind, int accepted, int skyrimFormId) implements CustomPacketPayload {
+	/** Host -> guest: how many requested Minecraft items were actually accepted. */
+	public record ResourceTransferAck(int requestId, int itemHash, int accepted) implements CustomPacketPayload {
 		public static final Type<ResourceTransferAck> TYPE = new Type<>(Identifier.fromNamespaceAndPath(SkyCraft.MOD_ID, "resource_transfer_ack"));
 		public static final StreamCodec<RegistryFriendlyByteBuf, ResourceTransferAck> CODEC = StreamCodec.composite(
 			ByteBufCodecs.INT, ResourceTransferAck::requestId,
-			ByteBufCodecs.VAR_INT, ResourceTransferAck::kind,
+			ByteBufCodecs.INT, ResourceTransferAck::itemHash,
 			ByteBufCodecs.VAR_INT, ResourceTransferAck::accepted,
-			ByteBufCodecs.INT, ResourceTransferAck::skyrimFormId,
 			ResourceTransferAck::new
 		);
 
@@ -139,10 +137,10 @@ public final class SkyNet {
 			ServerPlayer player = context.player();
 			int count = Math.max(0, Math.min(payload.count(), 4096));
 			context.server().execute(() -> {
-				int accepted = ResourceBridge.grant(player, payload.kind(), count);
+				int accepted = ResourceBridge.grant(player, payload.itemHash(), count);
 				if (ServerPlayNetworking.canSend(player, ResourceTransferAck.TYPE)) {
 					ServerPlayNetworking.send(player,
-						new ResourceTransferAck(payload.requestId(), payload.kind(), accepted, payload.skyrimFormId()));
+						new ResourceTransferAck(payload.requestId(), payload.itemHash(), accepted));
 				}
 			});
 		});

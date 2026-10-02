@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "notes": "Universal Skyrim -> Minecraft mappings. Restart Skyrim after editing. Ratios are acquisition-batch based in this test build.",
+  "mappings": [
+    { "name": "Iron Ingot",     "skyrimFormId": "0005ACE4", "minecraftItem": "minecraft:iron_ingot", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
+    { "name": "Gold Ingot",     "skyrimFormId": "0005AD9E", "minecraftItem": "minecraft:gold_ingot", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
+    { "name": "Leather",        "skyrimFormId": "000DB5D2", "minecraftItem": "minecraft:leather", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
+    { "name": "Wheat",          "skyrimFormId": "0004B0BA", "minecraftItem": "minecraft:wheat", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
+    { "name": "Iron Ore",       "skyrimFormId": "00071CF3", "minecraftItem": "minecraft:raw_iron", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
+    { "name": "Gold Ore",       "skyrimFormId": "0005ACDE", "minecraftItem": "minecraft:raw_gold", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
+    { "name": "Red Apple",      "skyrimFormId": "00064B2E", "minecraftItem": "minecraft:apple", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
+    { "name": "Green Apple",    "skyrimFormId": "00064B2F", "minecraftItem": "minecraft:apple", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
+    { "name": "Bread",          "skyrimFormId": "00065C97", "minecraftItem": "minecraft:bread", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
+    { "name": "Carrot",         "skyrimFormId": "00064B40", "minecraftItem": "minecraft:carrot", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
+    { "name": "Potato",         "skyrimFormId": "00064B41", "minecraftItem": "minecraft:potato", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
+    { "name": "Chicken's Egg",  "skyrimFormId": "00023D77", "minecraftItem": "minecraft:egg", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
+    { "name": "Bone Meal",      "skyrimFormId": "00034CDD", "minecraftItem": "minecraft:bone_meal", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
+    { "name": "Iron Arrow",     "skyrimFormId": "0001397D", "minecraftItem": "minecraft:arrow", "skyrimCount": 1, "minecraftCount": 1, "enabled": true },
+    { "name": "Leather Strips", "skyrimFormId": "000800E4", "minecraftItem": "minecraft:leather", "skyrimCount": 4, "minecraftCount": 1, "enabled": true }
+  ]
+}

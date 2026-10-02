@@ -64,7 +64,7 @@ public final class InputBridge {
 			}
 			case Proto.IN_RELEASE_ALL -> releaseAll();
 			case Proto.IN_HURT -> hurt(minecraft, code, a / 100.0F, b, c);
-			case Proto.IN_RESOURCE_TRANSFER -> transferResource(minecraft, code, a, b, c);
+			case Proto.IN_RESOURCE_TRANSFER -> transferResource(minecraft, a, b, c);
 			case Proto.IN_OPEN_MENU -> {
 				if (minecraft.gui.screen() == null && minecraft.player != null) {
 					releaseAll();
@@ -99,20 +99,19 @@ public final class InputBridge {
 	}
 
 
-	/** Skyrim acquired a supported resource. Grant it on the authoritative Minecraft server. */
-	private static void transferResource(Minecraft minecraft, int kind, int requestId, int count, int skyrimFormId) {
+	/** Skyrim acquired a mapped item. Grant it on the authoritative Minecraft server. */
+	private static void transferResource(Minecraft minecraft, int requestId, int count, int itemHash) {
 		if (minecraft.player == null || count <= 0) {
-			resourceAck(requestId, kind, skyrimFormId, 0);
+			resourceAck(requestId, itemHash, 0);
 			return;
 		}
 		var server = minecraft.getSingleplayerServer();
 		if (server == null) {
-			// Guest in somebody else's SkyCraft world: the host owns the real inventory.
 			if (net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(dev.skycraft.net.SkyNet.ResourceTransfer.TYPE)) {
 				net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
-					new dev.skycraft.net.SkyNet.ResourceTransfer(requestId, kind, count, skyrimFormId));
+					new dev.skycraft.net.SkyNet.ResourceTransfer(requestId, itemHash, count));
 			} else {
-				resourceAck(requestId, kind, skyrimFormId, 0);
+				resourceAck(requestId, itemHash, 0);
 			}
 			return;
 		}
@@ -120,14 +119,14 @@ public final class InputBridge {
 		var uuid = minecraft.player.getUUID();
 		server.execute(() -> {
 			ServerPlayer player = server.getPlayerList().getPlayer(uuid);
-			int accepted = player != null ? ResourceBridge.grant(player, kind, count) : 0;
-			resourceAck(requestId, kind, skyrimFormId, accepted);
+			int accepted = player != null ? ResourceBridge.grant(player, itemHash, count) : 0;
+			resourceAck(requestId, itemHash, accepted);
 		});
 	}
 
-	public static void resourceAck(int requestId, int kind, int skyrimFormId, int accepted) {
+	public static void resourceAck(int requestId, int itemHash, int accepted) {
 		if (SkyLink.active()) {
-			SkyLink.pushEvent(Proto.EV_RESOURCE_TRANSFER_ACK, skyrimFormId, accepted, 0, 0, 0, requestId, kind);
+			SkyLink.pushEvent(Proto.EV_RESOURCE_TRANSFER_ACK, 0, accepted, 0, 0, 0, requestId, itemHash);
 		}
 	}
 

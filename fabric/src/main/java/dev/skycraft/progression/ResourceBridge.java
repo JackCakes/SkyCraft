@@ -1,42 +1,66 @@
 package dev.skycraft.progression;
 
 import dev.skycraft.SkyCraft;
-import dev.skycraft.link.Proto;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Prediction;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 
-/**
- * Grants resources requested by the player's own Skyrim. The Skyrim side keeps its original item
- * until it receives an acknowledgement, so a missing link or rejected request is non-destructive.
- */
 public final class ResourceBridge {
 	private static final int MAX_REQUEST = 4096;
+	private static final Map<Integer, Item> ITEMS_BY_HASH = new HashMap<>();
+	private static final Set<Integer> HASH_COLLISIONS = new HashSet<>();
+	private static boolean indexed;
 
-	private ResourceBridge() {
+	private ResourceBridge() {}
+
+	public static int itemHash(String id) {
+		int hash = 0x811C9DC5;
+		for (int i = 0; i < id.length(); i++) {
+			hash ^= id.charAt(i) & 0xFF;
+			hash *= 0x01000193;
+		}
+		return hash;
 	}
 
-	public static int grant(ServerPlayer player, int kind, int requested) {
-		if (player == null || requested <= 0) {
+	private static synchronized void ensureIndex() {
+		if (indexed) return;
+		for (Item item : BuiltInRegistries.ITEM) {
+			var id = BuiltInRegistries.ITEM.getKey(item);
+			if (id == null) continue;
+			int hash = itemHash(id.toString());
+			Item old = ITEMS_BY_HASH.putIfAbsent(hash, item);
+			if (old != null && old != item) {
+				HASH_COLLISIONS.add(hash);
+				ITEMS_BY_HASH.remove(hash);
+				SkyCraft.LOG.error("SkyCraft progression: registry hash collision {} between {} and {}",
+					Integer.toUnsignedString(hash), BuiltInRegistries.ITEM.getKey(old), id);
+			}
+		}
+		indexed = true;
+		SkyCraft.LOG.info("SkyCraft progression: indexed {} Minecraft items ({} hash collisions)",
+			ITEMS_BY_HASH.size(), HASH_COLLISIONS.size());
+	}
+
+	public static int grant(ServerPlayer player, int itemHash, int requested) {
+		if (player == null || requested <= 0) return 0;
+		ensureIndex();
+		if (HASH_COLLISIONS.contains(itemHash)) {
+			SkyCraft.LOG.warn("SkyCraft progression: rejected ambiguous item hash {}", Integer.toUnsignedString(itemHash));
 			return 0;
 		}
-		int count = Math.min(requested, MAX_REQUEST);
-		Item item = switch (kind) {
-			case Proto.RESOURCE_IRON_INGOT -> Items.IRON_INGOT;
-			case Proto.RESOURCE_GOLD_INGOT -> Items.GOLD_INGOT;
-			case Proto.RESOURCE_LEATHER -> Items.LEATHER;
-			case Proto.RESOURCE_WHEAT -> Items.WHEAT;
-			case Proto.RESOURCE_IRON_ORE -> Items.RAW_IRON;
-			case Proto.RESOURCE_GOLD_ORE -> Items.RAW_GOLD;
-			default -> null;
-		};
+		Item item = ITEMS_BY_HASH.get(itemHash);
 		if (item == null) {
-			SkyCraft.LOG.warn("SkyCraft progression: unknown resource kind {}", kind);
+			SkyCraft.LOG.warn("SkyCraft progression: unknown item hash {}", Integer.toUnsignedString(itemHash));
 			return 0;
 		}
 
+		int count = Math.min(requested, MAX_REQUEST);
 		int accepted = 0;
 		int remaining = count;
 		while (remaining > 0) {
@@ -45,19 +69,14 @@ public final class ResourceBridge {
 			player.getInventory().add(stack);
 			int overflow = stack.getCount();
 			accepted += chunk - overflow;
-
-			// Full Minecraft inventory must not destroy a Skyrim item. Overflow becomes a normal
-			// Minecraft item entity at the player's feet and is still considered accepted.
 			if (overflow > 0) {
 				var dropped = player.drop(stack, false, Prediction.SERVER_ONLY);
-				if (dropped != null) {
-					accepted += overflow;
-				}
+				if (dropped != null) accepted += overflow;
 			}
 			remaining -= chunk;
 		}
-
-		SkyCraft.LOG.info("SkyCraft progression: granted resource {} x{} to {}", kind, accepted, player.getPlainTextName());
+		SkyCraft.LOG.info("SkyCraft progression: granted {} x{} to {}",
+			BuiltInRegistries.ITEM.getKey(item), accepted, player.getPlainTextName());
 		return accepted;
 	}
 }

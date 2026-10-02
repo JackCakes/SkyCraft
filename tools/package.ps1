@@ -107,6 +107,7 @@ Remove-Item -Recurse -Force $bundle
 New-Zip "$dist\SkyCraft-$version.zip" ([ordered]@{
     "SKSE/Plugins/SkyCraft.dll" = $dll
     "SKSE/Plugins/SkyCraft.ini" = "$root\skse\SkyCraft.ini"
+    "SKSE/Plugins/SkyCraftMappings.json" = "$root\SkyCraftMappings.json"
     "SKSE/Plugins/SkyCraft/SkyCraft-Minecraft.zip" = "$dist\SkyCraft-Minecraft.zip"
     "SKSE/Plugins/SkyCraft/LICENSE.txt" = "$root\LICENSE"
     "SKSE/Plugins/SkyCraft/THIRD-PARTY-NOTICES.md" = "$root\THIRD-PARTY-NOTICES.md"
