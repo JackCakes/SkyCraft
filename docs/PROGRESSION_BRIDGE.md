@@ -9,9 +9,15 @@ in Skyrim.
 |---|---|
 | Iron Ingot (`0005ACE4`) | Iron Ingot |
 | Gold Ingot (`0005AD9E`) | Gold Ingot |
+| Leather (`000DB5D2`) | Leather |
+| Wheat (`0004B0BA`) | Wheat |
+| Iron Ore (`00071CF3`) | Raw Iron |
+| Gold Ore (`0005ACDE`) | Raw Gold |
 
 Only newly acquired supported items are converted. Quest items, weapons, armor, keys, books and every
-unlisted Skyrim item are ignored.
+unlisted Skyrim item are ignored. Skyrim's common charcoal stick (`00033760`) is intentionally not
+converted because it is used by the Thieves Guild quest **Hard Answers**; this test build avoids
+risking quest progression.
 
 ## Safety model
 
@@ -38,6 +44,10 @@ the source resource.
 bEnabled = 1
 bIronIngots = 1
 bGoldIngots = 1
+bLeather = 1
+bWheat = 1
+bIronOre = 1
+bGoldOre = 1
 ```
 
 Restart Skyrim after changing these settings.
@@ -52,7 +62,7 @@ Minecraft inventory and returns an acknowledgement to the guest's Skyrim.
 
 ## Install / rollback
 
-The GitHub Actions artifact contains an MO2-ready `SkyCraft-0.1.2-progression.1.zip`. Install it as a
+The GitHub Actions artifact contains an MO2-ready `SkyCraft-0.1.2-progression.2.zip`. Install it as a
 separate mod after the normal SkyCraft entry so it wins file conflicts.
 
 To roll back, disable/remove the progression test mod in MO2 and enable the original SkyCraft. On the

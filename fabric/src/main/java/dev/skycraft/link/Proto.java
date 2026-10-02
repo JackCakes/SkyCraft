@@ -43,6 +43,10 @@ public final class Proto {
 	public static final int IN_RESOURCE_TRANSFER = 9;
 	public static final int RESOURCE_IRON_INGOT = 1;
 	public static final int RESOURCE_GOLD_INGOT = 2;
+	public static final int RESOURCE_LEATHER = 3;
+	public static final int RESOURCE_WHEAT = 4;
+	public static final int RESOURCE_IRON_ORE = 5;
+	public static final int RESOURCE_GOLD_ORE = 6;
 	public static final int HURT_MELEE = 0;
 	public static final int HURT_PROJECTILE = 1;
 	public static final int HURT_MAGIC = 2;

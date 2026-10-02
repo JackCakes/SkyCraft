@@ -8,6 +8,10 @@ namespace skycraft::ResourceBridge
 	{
 		constexpr RE::FormID kIronIngot = 0x0005ACE4;
 		constexpr RE::FormID kGoldIngot = 0x0005AD9E;
+		constexpr RE::FormID kLeather = 0x000DB5D2;
+		constexpr RE::FormID kWheat = 0x0004B0BA;
+		constexpr RE::FormID kIronOre = 0x00071CF3;
+		constexpr RE::FormID kGoldOre = 0x0005ACDE;
 		constexpr std::int32_t kMaxPerRequest = 4096;
 
 		struct Settings
@@ -15,6 +19,10 @@ namespace skycraft::ResourceBridge
 			bool enabled{ true };
 			bool iron{ true };
 			bool gold{ true };
+			bool leather{ true };
+			bool wheat{ true };
+			bool ironOre{ true };
+			bool goldOre{ true };
 		};
 
 		struct Pending
@@ -37,6 +45,10 @@ namespace skycraft::ResourceBridge
 			out.enabled = ini.GetBoolValue("ProgressionBridge", "bEnabled", true);
 			out.iron = ini.GetBoolValue("ProgressionBridge", "bIronIngots", true);
 			out.gold = ini.GetBoolValue("ProgressionBridge", "bGoldIngots", true);
+			out.leather = ini.GetBoolValue("ProgressionBridge", "bLeather", true);
+			out.wheat = ini.GetBoolValue("ProgressionBridge", "bWheat", true);
+			out.ironOre = ini.GetBoolValue("ProgressionBridge", "bIronOre", true);
+			out.goldOre = ini.GetBoolValue("ProgressionBridge", "bGoldOre", true);
 			return out;
 		}
 
@@ -47,6 +59,14 @@ namespace skycraft::ResourceBridge
 				return settings.iron ? std::optional{ proto::kResourceIronIngot } : std::nullopt;
 			case kGoldIngot:
 				return settings.gold ? std::optional{ proto::kResourceGoldIngot } : std::nullopt;
+			case kLeather:
+				return settings.leather ? std::optional{ proto::kResourceLeather } : std::nullopt;
+			case kWheat:
+				return settings.wheat ? std::optional{ proto::kResourceWheat } : std::nullopt;
+			case kIronOre:
+				return settings.ironOre ? std::optional{ proto::kResourceIronOre } : std::nullopt;
+			case kGoldOre:
+				return settings.goldOre ? std::optional{ proto::kResourceGoldOre } : std::nullopt;
 			default:
 				return std::nullopt;
 			}
@@ -59,6 +79,14 @@ namespace skycraft::ResourceBridge
 				return "iron ingot";
 			case proto::kResourceGoldIngot:
 				return "gold ingot";
+			case proto::kResourceLeather:
+				return "leather";
+			case proto::kResourceWheat:
+				return "wheat";
+			case proto::kResourceIronOre:
+				return "iron ore";
+			case proto::kResourceGoldOre:
+				return "gold ore";
 			default:
 				return "resource";
 			}
@@ -148,7 +176,9 @@ namespace skycraft::ResourceBridge
 		}
 		if (auto* events = RE::ScriptEventSourceHolder::GetSingleton()) {
 			events->AddEventSink<RE::TESContainerChangedEvent>(ContainerSink::Get());
-			logger::info("progression bridge installed (iron {}, gold {})", settings.iron ? "on" : "off", settings.gold ? "on" : "off");
+			logger::info("progression bridge installed (iron {}, gold {}, leather {}, wheat {}, iron ore {}, gold ore {})",
+				settings.iron ? "on" : "off", settings.gold ? "on" : "off", settings.leather ? "on" : "off",
+				settings.wheat ? "on" : "off", settings.ironOre ? "on" : "off", settings.goldOre ? "on" : "off");
 		} else {
 			logger::warn("progression bridge: Skyrim event source unavailable");
 		}

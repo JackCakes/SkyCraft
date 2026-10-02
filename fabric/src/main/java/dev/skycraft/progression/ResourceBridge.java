@@ -26,6 +26,10 @@ public final class ResourceBridge {
 		Item item = switch (kind) {
 			case Proto.RESOURCE_IRON_INGOT -> Items.IRON_INGOT;
 			case Proto.RESOURCE_GOLD_INGOT -> Items.GOLD_INGOT;
+			case Proto.RESOURCE_LEATHER -> Items.LEATHER;
+			case Proto.RESOURCE_WHEAT -> Items.WHEAT;
+			case Proto.RESOURCE_IRON_ORE -> Items.RAW_IRON;
+			case Proto.RESOURCE_GOLD_ORE -> Items.RAW_GOLD;
 			default -> null;
 		};
 		if (item == null) {

@@ -202,6 +202,10 @@ namespace skycraft::proto
 	{
 		kResourceIronIngot = 1,
 		kResourceGoldIngot = 2,
+		kResourceLeather = 3,
+		kResourceWheat = 4,
+		kResourceIronOre = 5,
+		kResourceGoldOre = 6,
 	};
 
 	// ---- actor table @0x12000 (Skyrim -> MC, seqlock) ----------------------------------------
