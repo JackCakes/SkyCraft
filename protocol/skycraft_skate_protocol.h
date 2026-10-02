@@ -11,12 +11,13 @@
 namespace skycraft::skateproto
 {
 	inline constexpr std::uint32_t kMagic = 0x4B534353;  // bytes: "SCSK"
-	inline constexpr std::uint32_t kVersion = 1;
+	inline constexpr std::uint32_t kVersion = 2;
 	inline constexpr wchar_t       kMappingName[] = L"Local\\SkyCraftSkate_v1";
 
 	inline constexpr std::uint64_t kOffHeader = 0x0000;
 	inline constexpr std::uint64_t kOffSkyState = 0x0100;
 	inline constexpr std::uint64_t kOffSkateState = 0x0200;
+	inline constexpr std::uint64_t kOffInputState = 0x0300;
 	inline constexpr std::uint64_t kOffCollisionRing = 0x1000;
 
 	inline constexpr std::uint64_t kCollisionRingBytes = 16ull << 20;
@@ -95,6 +96,29 @@ namespace skycraft::skateproto
 		std::uint32_t stateCode;
 	};
 	static_assert(sizeof(SkateState) == 128);
+
+	enum InputFlags : std::uint32_t
+	{
+		kInputValid = 1u << 0,
+		kInputKeyboardFallback = 1u << 1,
+	};
+
+	// XInput-shaped controller snapshot. This mirrors the raw controller shape
+	// consumed by the Skate host so the eventual retail-backed Session can use
+	// the same transport without another protocol redesign.
+	struct InputState
+	{
+		std::uint32_t seq;
+		std::uint32_t flags;
+		std::uint16_t buttons;
+		std::uint8_t  triggers[2];
+		std::int16_t  left[2];
+		std::int16_t  right[2];
+		std::uint32_t packet;
+		float         frameSeconds;
+		std::uint32_t reserved[9];
+	};
+	static_assert(sizeof(InputState) == 64);
 
 	enum ColType : std::uint32_t
 	{
