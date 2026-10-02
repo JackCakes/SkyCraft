@@ -47,6 +47,12 @@ public final class WeaponAffixes {
 
     private static AffixConfig config = defaults();
     private static final Map<String, AffixDefinition> BY_ID = new LinkedHashMap<>();
+    private static final List<String> CORE_WEAPONS = List.of(
+        "skyrim_iron_dagger",
+        "skyrim_iron_sword",
+        "skyrim_iron_greatsword",
+        "skyrim_iron_battleaxe"
+    );
 
     private WeaponAffixes() {}
 
@@ -74,9 +80,9 @@ public final class WeaponAffixes {
                         ServerPlayer player = context.getSource().getPlayerOrException();
                         String id = StringArgumentType.getString(context, "id").toLowerCase(java.util.Locale.ROOT);
                         AffixDefinition def = BY_ID.get(id);
-                        Item item = SkyrimWeapons.byId("skyrim_iron_sword");
+                        Item item = def == null ? null : testItemFor(def);
                         if (def == null || item == null) {
-                            player.sendSystemMessage(Component.literal("Unknown affix '" + id + "'. Available: " + String.join(", ", BY_ID.keySet())));
+                            player.sendSystemMessage(Component.literal("Unknown or inapplicable affix '" + id + "'. Available: " + String.join(", ", BY_ID.keySet())));
                             return 0;
                         }
                         ItemStack stack = new ItemStack(item);
@@ -130,20 +136,31 @@ public final class WeaponAffixes {
             return Optional.empty();
         }
 
+        List<AffixDefinition> candidates = BY_ID.values().stream()
+            .filter(def -> appliesTo(def, stack))
+            .toList();
+        if (candidates.isEmpty()) {
+            markNoAffix(stack);
+            return Optional.empty();
+        }
+
         double total = 0.0;
-        for (AffixDefinition def : BY_ID.values()) total += def.weight;
-        if (!(total > 0.0)) return Optional.empty();
+        for (AffixDefinition def : candidates) total += def.weight;
+        if (!(total > 0.0)) {
+            markNoAffix(stack);
+            return Optional.empty();
+        }
 
         double pick = random.nextDouble() * total;
         AffixDefinition chosen = null;
-        for (AffixDefinition def : BY_ID.values()) {
+        for (AffixDefinition def : candidates) {
             pick -= def.weight;
             if (pick <= 0.0) {
                 chosen = def;
                 break;
             }
         }
-        if (chosen == null) chosen = BY_ID.values().iterator().next();
+        if (chosen == null) chosen = candidates.getFirst();
 
         apply(stack, chosen);
         SkyCraft.LOG.info("SkyCraft affix: rolled {} on {}", chosen.id, BuiltInRegistries.ITEM.getKey(stack.getItem()));
@@ -180,6 +197,24 @@ public final class WeaponAffixes {
         stored.putString("id", "none");
         root.put(ROOT, stored);
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(root));
+    }
+
+    private static boolean appliesTo(AffixDefinition def, ItemStack stack) {
+        if (def == null || stack == null || stack.isEmpty()) return false;
+        Identifier itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        return itemId != null && appliesToPath(def, itemId.getPath());
+    }
+
+    private static boolean appliesToPath(AffixDefinition def, String path) {
+        return def.allowedWeapons.contains("*") || def.allowedWeapons.contains(path);
+    }
+
+    private static Item testItemFor(AffixDefinition def) {
+        for (String path : CORE_WEAPONS) {
+            Item item = SkyrimWeapons.byId(path);
+            if (item != null && appliesToPath(def, path)) return item;
+        }
+        return null;
     }
 
     private static Optional<StoredAffix> readStored(ItemStack stack) {
@@ -323,6 +358,20 @@ public final class WeaponAffixes {
         d.durabilityMultiplier = clamp(d.durabilityMultiplier, 0.05, 10.0);
         d.procChance = clamp(d.procChance, 0.0, 1.0);
         d.procDamageMultiplier = clamp(d.procDamageMultiplier, 1.0, 20.0);
+        if (d.allowedWeapons == null || d.allowedWeapons.isEmpty()) {
+            d.allowedWeapons = new ArrayList<>(List.of("*"));
+        } else {
+            ArrayList<String> allowed = new ArrayList<>();
+            for (String raw : d.allowedWeapons) {
+                if (raw == null) continue;
+                String weapon = raw.trim().toLowerCase(java.util.Locale.ROOT);
+                if ("*".equals(weapon) || CORE_WEAPONS.contains(weapon)) {
+                    if (!allowed.contains(weapon)) allowed.add(weapon);
+                }
+            }
+            if (allowed.isEmpty()) allowed.add("*");
+            d.allowedWeapons = allowed;
+        }
         return d.weight > 0.0 && !d.displayName.isEmpty() ? d : null;
     }
 
@@ -334,11 +383,15 @@ public final class WeaponAffixes {
         AffixConfig c = new AffixConfig();
         c.rollChance = 0.70;
         c.affixes = new ArrayList<>(List.of(
-            new AffixDefinition("brutal", "Brutal", 25, 1.25, 1.0, 0.0, 1.0, 0.0, 1.0, true),
-            new AffixDefinition("swift", "Swift", 25, 1.0, 1.30, 0.0, 1.0, 0.0, 1.0, true),
-            new AffixDefinition("long", "Long", 15, 1.0, 1.0, 0.50, 1.0, 0.0, 1.0, true),
-            new AffixDefinition("sturdy", "Sturdy", 15, 1.0, 1.0, 0.0, 1.50, 0.0, 1.0, true),
-            new AffixDefinition("volatile", "Volatile", 20, 1.0, 1.0, 0.0, 1.0, 0.10, 3.0, true)
+            new AffixDefinition("brutal", "Brutal", 25, 1.25, 1.0, 0.0, 1.0, 0.0, 1.0, List.of("*"), true),
+            new AffixDefinition("swift", "Swift", 25, 1.0, 1.30, 0.0, 1.0, 0.0, 1.0, List.of("skyrim_iron_dagger", "skyrim_iron_sword"), true),
+            new AffixDefinition("long", "Long", 15, 1.0, 1.0, 0.50, 1.0, 0.0, 1.0, List.of("skyrim_iron_sword", "skyrim_iron_greatsword"), true),
+            new AffixDefinition("sturdy", "Sturdy", 15, 1.0, 1.0, 0.0, 1.50, 0.0, 1.0, List.of("*"), true),
+            new AffixDefinition("volatile", "Volatile", 20, 1.0, 1.0, 0.0, 1.0, 0.10, 3.0, List.of("*"), true),
+            new AffixDefinition("deadly", "Deadly", 12, 1.15, 1.15, 0.0, 1.0, 0.0, 1.0, List.of("*"), true),
+            new AffixDefinition("flurried", "Flurried", 10, 0.90, 1.50, 0.0, 1.0, 0.0, 1.0, List.of("skyrim_iron_dagger", "skyrim_iron_sword"), true),
+            new AffixDefinition("berserker", "Berserker", 10, 1.40, 0.80, 0.0, 1.10, 0.0, 1.0, List.of("skyrim_iron_greatsword", "skyrim_iron_battleaxe"), true),
+            new AffixDefinition("giant", "Giant", 8, 1.20, 0.90, 0.75, 1.0, 0.0, 1.0, List.of("skyrim_iron_greatsword", "skyrim_iron_battleaxe"), true)
         ));
         return c;
     }
@@ -368,13 +421,15 @@ public final class WeaponAffixes {
         public double durabilityMultiplier = 1.0;
         public double procChance = 0.0;
         public double procDamageMultiplier = 1.0;
+        public List<String> allowedWeapons = new ArrayList<>(List.of("*"));
         public boolean enabled = true;
 
         public AffixDefinition() {}
 
         public AffixDefinition(String id, String displayName, double weight, double damageMultiplier,
                                double attackSpeedMultiplier, double reachAdd, double durabilityMultiplier,
-                               double procChance, double procDamageMultiplier, boolean enabled) {
+                               double procChance, double procDamageMultiplier, List<String> allowedWeapons,
+                               boolean enabled) {
             this.id = id;
             this.displayName = displayName;
             this.weight = weight;
@@ -384,6 +439,7 @@ public final class WeaponAffixes {
             this.durabilityMultiplier = durabilityMultiplier;
             this.procChance = procChance;
             this.procDamageMultiplier = procDamageMultiplier;
+            this.allowedWeapons = new ArrayList<>(allowedWeapons);
             this.enabled = enabled;
         }
     }
