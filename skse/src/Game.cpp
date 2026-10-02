@@ -938,7 +938,7 @@ namespace skycraft
 				HideFirstPersonMeshes(a_player, true);
 
 				const bool hostCamera =
-					(skateState.flags & skateproto::kHostCameraValid) != 0 && skateCameraFinite;
+					(skateState.flags & skateproto::kHostCameraValid) != 0 && skateCameraFinite && rotValidated;
 				if (hostCamera) {
 					eyePos = McToSky(
 						skateState.cameraPos[0],
