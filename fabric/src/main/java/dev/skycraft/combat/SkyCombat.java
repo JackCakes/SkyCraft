@@ -247,6 +247,34 @@ public final class SkyCombat {
 		}
 	}
 
+
+	/**
+	 * Finds the closest mirrored Skyrim actor intersected by the player's look ray.
+	 * Used by Minecraft-side ranged magic so spell targeting shares the same actor bridge as
+	 * arrows and melee rather than inventing a second Skyrim hit path.
+	 */
+	public static @Nullable SkyrimActorEntity findTarget(ServerPlayer player, double range) {
+		var from = player.getEyePosition();
+		var to = from.add(player.getLookAngle().scale(range));
+		SkyrimActorEntity best = null;
+		double bestDistance = range * range;
+		for (SkyrimActorEntity proxy : PROXIES.values()) {
+			if (proxy.isRemoved() || proxy.level() != player.level() || !proxy.isAlive()) {
+				continue;
+			}
+			var hit = proxy.getBoundingBox().inflate(0.25).clip(from, to);
+			if (hit.isEmpty()) {
+				continue;
+			}
+			double distance = from.distanceToSqr(hit.get());
+			if (distance < bestDistance) {
+				bestDistance = distance;
+				best = proxy;
+			}
+		}
+		return best;
+	}
+
 	/** Form id of the Skyrim actor behind a damage source, or 0. */
 	public static int attackerFormId(DamageSource source) {
 		return source.getEntity() instanceof SkyrimActorEntity proxy ? proxy.formId() : 0;
