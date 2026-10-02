@@ -41,6 +41,7 @@ namespace skycraft
 		constexpr std::uint32_t kDikJ = 0x24;        // Skyrim quest journal
 		constexpr std::uint32_t kDikM = 0x32;        // Skyrim map
 		constexpr std::uint32_t kDikO = 0x18;        // Minecraft pause / options menu (Esc is Skyrim's)
+		constexpr std::uint32_t kDikF8 = 0x42;       // Explicit Skyrim inventory while Minecraft drives
 		constexpr std::uint32_t kDikF9 = 0x43;       // Skyrim quickload
 
 		bool IsSkyrimMenuKey(std::uint32_t a_code)
@@ -78,6 +79,23 @@ namespace skycraft
 			}
 			if (auto* queue = RE::UIMessageQueue::GetSingleton()) {
 				queue->AddMessage(RE::SleepWaitMenu::MENU_NAME, RE::UI_MESSAGE_TYPE::kShow, nullptr);
+			}
+		}
+
+		// SkyCraft intentionally intercepts the normal Skyrim inventory keys while Minecraft
+		// owns the player. F8 is an explicit escape hatch into Skyrim's real InventoryMenu.
+		// Once it opens, the existing blocking-menu path hands menu input back to Skyrim.
+		void OpenSkyrimInventory()
+		{
+			if (auto* ui = RE::UI::GetSingleton(); ui && ui->IsMenuOpen(RE::InventoryMenu::MENU_NAME)) {
+				return;
+			}
+			Input::ReleaseAll();
+			if (auto* queue = RE::UIMessageQueue::GetSingleton()) {
+				queue->AddMessage(RE::InventoryMenu::MENU_NAME, RE::UI_MESSAGE_TYPE::kShow, nullptr);
+				logger::info("F8: opening Skyrim inventory");
+			} else {
+				logger::warn("F8: Skyrim UI message queue unavailable; inventory not opened");
 			}
 		}
 
@@ -190,7 +208,8 @@ namespace skycraft
 
 		// MenuControls opens Skyrim's menus (Tab, I, J, M, Wait, quicksave, ...). While Minecraft
 		// drives the player only Esc, the console, M (map), J (journal) and F9 (quickload) reach
-		// it (F5 is Minecraft's camera); while an MC screen is open nothing does.
+		// it. F8 is handled directly above as the explicit Skyrim inventory key (F5 is Minecraft's
+		// camera); while an MC screen is open nothing goes to Skyrim.
 		struct MenuControlsHook
 		{
 			static RE::BSEventNotifyControl thunk(RE::MenuControls* a_this, RE::InputEvent* const* a_event, RE::BSTEventSource<RE::InputEvent*>* a_source)
