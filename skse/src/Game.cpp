@@ -95,6 +95,9 @@ namespace skycraft
 		// before then sends empty regions, so wait for the world to settle first.
 		float          settleTimer = 2.0f;
 		constexpr float kSettleSeconds = 1.5f;
+		// F6 requests the experimental external Skate authority. The request is
+		// deliberately process-local and never saved into Skyrim.
+		bool           skateRequested = false;
 
 		RE::NiPoint3      eyePos{};
 		// Meshes of Skyrim's first-person model we hid for Minecraft's third-person camera.
@@ -577,10 +580,32 @@ namespace skycraft
 			auto*      cell = a_player->GetParentCell();
 			const bool loading = !cell || !a_player->Is3DLoaded() || ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME);
 			const bool menu = AnyBlockingMenuOpen(ui);
-			if ((menu || loading) && !st.skyrimMenuOpen) {
+			const bool menuWasOpen = st.skyrimMenuOpen.load();
+			if ((menu || loading) && !menuWasOpen) {
 				Input::ReleaseAll();
 			}
+			// A pausing menu can stop this per-frame update after the input sink has
+			// already marked it open. If Skate authority was requested, treat that
+			// observation as a hard preemption when the game thread resumes.
+			if (menuWasOpen && skateRequested) {
+				logger::info("Skate mode cancelled because a Skyrim menu took focus");
+				skateRequested = false;
+				teleportPending = true;
+			}
 			st.skyrimMenuOpen = menu || loading;
+
+			if (!menu && !loading && (::GetAsyncKeyState(VK_F6) & 1)) {
+				skateRequested = !skateRequested;
+				if (!skateRequested) {
+					// The next normal SkyCraft frame sends Minecraft to wherever the
+					// host left Skyrim instead of snapping Skyrim back to old MC state.
+					teleportPending = true;
+				}
+				logger::info(
+					"Skate mode requested {} (host {})",
+					skateRequested ? "on" : "off",
+					skateBridge.HostAlive() ? "connected" : "not connected");
+			}
 
 			// World identity: exterior worldspace or interior cell. A change wipes MC's collision.
 			if (cell) {
@@ -598,7 +623,7 @@ namespace skycraft
 			}
 
 			// Skyrim moved the player itself (load door, fast travel, script, loading a save).
-			const auto current = a_player->GetPosition();
+			auto current = a_player->GetPosition();
 			if (loading) {
 				teleportPending = true;
 				haveLastSet = false;
@@ -645,7 +670,60 @@ namespace skycraft
 				}
 			}
 			takeover = takeoverNow;
-			const bool arriving = haveMc && st.mcInWorld && !loading && mc.teleportAck != teleportSeq && !takeover;
+
+			// Read the host's previous-frame output before deciding who owns movement.
+			// Authority is granted only after the host explicitly says ACTIVE and its
+			// target pose is finite and close to Skyrim's current player. This makes a
+			// stale/corrupt host state fail closed to normal SkyCraft.
+			skateproto::SkateState skateState{};
+			const bool haveSkateState = skateHostAlive && skateBridge.ReadSkateState(skateState);
+			const bool skatePoseFinite =
+				haveSkateState &&
+				std::isfinite(skateState.x) && std::isfinite(skateState.y) && std::isfinite(skateState.z) &&
+				std::isfinite(skateState.quat[0]) && std::isfinite(skateState.quat[1]) &&
+				std::isfinite(skateState.quat[2]) && std::isfinite(skateState.quat[3]);
+			const auto currentMc = SkyToMc(current);
+			const double skateGap = skatePoseFinite ?
+				std::sqrt(
+					(skateState.x - currentMc.x) * (skateState.x - currentMc.x) +
+					(skateState.y - currentMc.y) * (skateState.y - currentMc.y) +
+					(skateState.z - currentMc.z) * (skateState.z - currentMc.z)) :
+				std::numeric_limits<double>::infinity();
+			const bool skateHostActive =
+				skatePoseFinite &&
+				(skateState.flags & skateproto::kHostReady) != 0 &&
+				(skateState.flags & skateproto::kHostActive) != 0 &&
+				(skateState.flags & skateproto::kHostError) == 0;
+			const bool skateAuthority =
+				skateRequested && skateHostActive && skateGap <= 2.0 &&
+				!loading && !menu && !a_player->IsDead() && !takeover;
+
+			static bool skateWasActive = false;
+			if (!skateWasActive && skateAuthority) {
+				Input::ReleaseAll();
+				logger::info(
+					"Skate synthetic authority acquired at ({:.3f}, {:.3f}, {:.3f})",
+					skateState.x, skateState.y, skateState.z);
+			}
+			if (skateWasActive && !skateAuthority) {
+				const char* reason =
+					!skateRequested ? "requested off" :
+					!skateHostAlive ? "host disconnected" :
+					(skateState.flags & skateproto::kHostError) ? "host error" :
+					!skatePoseFinite ? "invalid host pose" :
+					skateGap > 2.0 ? "host pose exceeded safety radius" :
+					(menu || loading) ? "menu/loading" :
+					a_player->IsDead() ? "player death" :
+					takeover ? "Skyrim takeover" : "host inactive";
+				logger::info("Skate synthetic authority released ({})", reason);
+				skateRequested = false;
+				teleportPending = true;
+				Input::ReleaseAll();
+			}
+			skateWasActive = skateAuthority;
+			st.skateOwnsPlayer = skateAuthority;
+
+			const bool arriving = haveMc && st.mcInWorld && !loading && mc.teleportAck != teleportSeq && !takeover && !skateAuthority;
 			if (arriving) {
 				const auto   here = SkyToMc(current);
 				const double gap = std::sqrt((here.x - mc.x) * (here.x - mc.x) + (here.y - mc.y) * (here.y - mc.y) + (here.z - mc.z) * (here.z - mc.z));
@@ -660,7 +738,7 @@ namespace skycraft
 			}
 
 			// A dead Skyrim player gets Skyrim's own death camera and reload.
-			const bool puppet = haveMc && st.mcInWorld && mc.teleportAck == teleportSeq && !loading && !a_player->IsDead() && !takeover;
+			const bool puppet = haveMc && st.mcInWorld && mc.teleportAck == teleportSeq && !loading && !a_player->IsDead() && !takeover && !skateAuthority;
 			st.minecraftOwnsPlayer = puppet || (arriving && !a_player->IsDead());
 			if (puppet != st.puppeting) {
 				logger::info("puppet {}", puppet ? "on (Minecraft drives the player)" : "off");
@@ -807,6 +885,19 @@ namespace skycraft
 				++motion.frames;
 				motion.frameMsSum += frameMs;
 				motion.frameMsMax = std::max(motion.frameMsMax, frameMs);
+			}
+
+			if (skateAuthority) {
+				const auto pos = McToSky(skateState.x, skateState.y, skateState.z);
+				a_player->SetPosition(pos, true);
+				if (auto* controller = a_player->GetCharController()) {
+					controller->SetLinearVelocityImpl(RE::hkVector4(0.0f, 0.0f, 0.0f, 0.0f));
+					controller->fallStartHeight = pos.z;
+					controller->fallTime = 0.0f;
+				}
+				lastSetPos = pos;
+				haveLastSet = true;
+				current = pos;
 			}
 
 			if (puppet) {
@@ -1017,17 +1108,10 @@ namespace skycraft
 			}
 			link.WriteSkyState(sky);
 
-			// Experimental Skate bridge: publish the same world/player frame to the Rust host.
-			// This does not take movement authority yet; it only validates transport safely.
+			// Publish the current world/player frame to the external host. When F6
+			// requests Skate mode, the host may reply with kHostActive; movement
+			// authority is accepted on the following frame only after the checks above.
 			skateBridge.SetWorld(worldId);
-			static bool skateRequested = false;
-			if (!menu && !loading && (::GetAsyncKeyState(VK_F6) & 1)) {
-				skateRequested = !skateRequested;
-				logger::info(
-					"Skate mode requested {} (host {})",
-					skateRequested ? "on" : "off",
-					skateBridge.HostAlive() ? "connected" : "not connected");
-			}
 			skateproto::SkyState skateSky{};
 			skateSky.flags = (cell ? skateproto::kSkyInGame : 0u) |
 			                 (menu ? skateproto::kSkyMenuOpen : 0u) |
