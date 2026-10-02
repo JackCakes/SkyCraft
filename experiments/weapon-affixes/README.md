@@ -144,3 +144,15 @@ Each prefix now has a `rarity` field: `common`, `uncommon`, `rare`, `epic`, or
 prefix color on the actual weapon name and is stored on that weapon at roll time. This lets balance
 stay explicit in the numeric fields while still making exceptional drops immediately recognizable.
 The default Volatile prefix is Epic; Berserker, Giant and Veteran are Rare.
+
+
+## Source-level simulation
+
+For testing source-aware pools without hunting for a particular Skyrim NPC, use:
+
+`/skyaffixes simulate <level>`
+
+It creates 16 Iron Swords and rolls them as though they came from a Skyrim actor of that level.
+For example, `/skyaffixes simulate 19` cannot roll the default Veteran prefix, while
+`/skyaffixes simulate 20` can. This is development-only test tooling and does not change normal
+loot provenance.
