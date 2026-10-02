@@ -1,21 +1,49 @@
 # Skyrim -> Minecraft Universal Progression Bridge
 
-This test build moves the conversion table out of C++/Java and into an editable JSON file:
+The bridge is data-driven through:
 
 `Data/SKSE/Plugins/SkyCraftMappings.json`
 
 Each mapping has a Skyrim base FormID, Minecraft registry id, ratio, and enabled flag. The SKSE side
 hashes the Minecraft registry id with FNV-1a 32-bit; Fabric indexes the live item registry with the
-same hash. Adding another ordinary mapping no longer needs another protocol enum or Java/C++ switch.
+same hash. Adding another ordinary mapping does not require another protocol enum or Java/C++ switch.
 
-The first test set contains Iron/Gold ingots, Leather, Wheat, Iron/Gold ore, Red/Green Apple, Bread,
-Carrot, Potato, Chicken's Egg, Bone Meal, Iron Arrow, and a 4 Leather Strips -> 1 Leather ratio.
+## Progression.4
 
-Ratios are acquisition-batch based in this first test. Four strips received in one event convert;
-separate one-strip acquisitions do not yet accumulate.
+The default mapping pack now contains 51 enabled vanilla Skyrim mappings covering:
 
-Skyrim keeps the source item until Minecraft acknowledges the grant. Unknown registry ids, missing
-Minecraft, ring failure, stale acknowledgements, or hash collisions leave the Skyrim item untouched.
+- core ingots/ores, Leather, Wheat and Leather Strips;
+- common fruit, vegetables, raw/cooked meats and simple prepared foods;
+- Bone Meal, berries, feathers, Honeycomb and Moon Sugar;
+- twelve common vanilla arrow types, all feeding Minecraft arrows.
 
-No ESP/ESL or Papyrus state is added. Install `SkyCraft-0.1.2-progression.3.zip` after normal
-SkyCraft in MO2; disable it to roll back.
+Several entries are semantic Minecraft equivalents rather than literal same-name items. Examples:
+Pheasant Breast -> Chicken, Venison -> Mutton, Apple Pie/Sweet Roll -> Pumpkin Pie.
+
+## Ratio carry-over
+
+Ratio leftovers now accumulate across separate pickups during the current run. With the default
+Leather Strips mapping, four separate one-strip acquisitions can therefore complete the 4:1 conversion.
+
+The carry is bookkeeping only; the actual leftover items remain in Skyrim until a complete group is
+acknowledged by Minecraft. Loading a save/new game clears in-flight requests and carry bookkeeping,
+so it never stores hidden progression state in a save or SKSE co-save.
+
+## Transaction safety
+
+Skyrim keeps source items until Minecraft acknowledges the grant. Unknown registry ids, missing
+Minecraft, ring failure, stale acknowledgements, or hash collisions leave the source item in Skyrim.
+
+## Dedicated log
+
+Progression activity is mirrored to:
+
+`Documents/My Games/Skyrim Special Edition/SKSE/SkyCraftProgression.log`
+
+This small log contains mapping load, ratio carry, requests, acknowledgements/conversions and errors,
+so it can be shared without the much larger general SkyCraft log.
+
+## Install / rollback
+
+Install `SkyCraft-0.1.2-progression.4.zip` as a separate MO2 mod after normal SkyCraft and disable
+the older progression test mod. Disable/remove progression.4 to restore the base SkyCraft files.
