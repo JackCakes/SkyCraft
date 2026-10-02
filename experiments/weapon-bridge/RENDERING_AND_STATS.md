@@ -76,3 +76,35 @@ accident.
 4. Add an explicit Skyrim weapon-transfer protocol carrying source FormID + weapon metadata.
 5. Filter ordinary unenchanted instances first.
 6. Expand to steel/orcish/dwarven/etc. once the generic path works.
+
+
+## Core test family
+
+The first test family is intentionally only four weapons:
+
+- Iron Dagger
+- Iron Sword
+- Iron Greatsword
+- Iron Battleaxe
+
+All four use ordinary flat Minecraft-style item rendering. For this first behavior test the dagger,
+sword and greatsword reuse Minecraft's iron-sword sprite and the battleaxe reuses the iron-axe sprite.
+That keeps rendering boring and reliable while we validate stat feel. Custom 2D sprites can replace
+those model references later without touching weapon logic.
+
+The experimental build registers a no-cheats-required test command:
+
+`/skyweapons testkit`
+
+It adds one of each prototype weapon to the current Minecraft player's inventory. This is only an
+experiment convenience and should be removed before the weapon bridge is merged into a stable build.
+
+Suggested first-pass feel checks:
+
+- dagger: quickest recharge and noticeably shortest melee reach;
+- sword: baseline/balanced;
+- greatsword: clearly slower, harder-hitting, longer reach;
+- battleaxe: slowest and hardest-hitting of the four.
+
+Edit `config/skycraft-weapons.json`, restart Minecraft, and rerun the test kit command to compare
+different numbers. No recompilation is required for stat tuning.

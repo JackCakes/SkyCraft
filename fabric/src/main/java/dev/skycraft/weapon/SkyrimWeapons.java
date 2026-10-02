@@ -10,15 +10,20 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EquipmentSlotGroup;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
 
 /**
@@ -53,6 +58,24 @@ public final class SkyrimWeapons {
             SkyCraft.LOG.info("SkyCraft weapon prototype: {} damage={} speed={} reach={} durability={}",
                 id, stats.damage, stats.attackSpeed, stats.reach, stats.durability);
         }
+        registerTestCommand();
+    }
+
+    private static void registerTestCommand() {
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            dispatcher.register(Commands.literal("skyweapons")
+                .then(Commands.literal("testkit").executes(context -> {
+                    ServerPlayer player = context.getSource().getPlayerOrException();
+                    for (String id : DEFAULTS.keySet()) {
+                        Item item = ITEMS.get(id);
+                        if (item != null) {
+                            player.getInventory().add(new ItemStack(item));
+                        }
+                    }
+                    player.sendSystemMessage(Component.literal("SkyCraft weapon test kit added: dagger, sword, greatsword, battleaxe."));
+                    return 1;
+                })));
+        });
     }
 
     public static Item byId(String id) {
