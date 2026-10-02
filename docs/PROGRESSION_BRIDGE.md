@@ -47,3 +47,47 @@ so it can be shared without the much larger general SkyCraft log.
 
 Install `SkyCraft-0.1.2-progression.4.zip` as a separate MO2 mod after normal SkyCraft and disable
 the older progression test mod. Disable/remove progression.4 to restore the base SkyCraft files.
+
+
+## progression.5 safety and mod-aware mapping
+
+Version 5 keeps the validated progression.4 item set and transaction protocol, then hardens the
+mapping layer before larger gameplay categories are added.
+
+### Quest protection
+
+Mappings now default to `"protectQuestItems": true`. When the player's current inventory entry for
+a mapped base object is marked as a quest object, SkyCraft leaves it in Skyrim and does not submit
+that acquisition to Minecraft. The bridge checks again before ACK-driven removal.
+
+This is deliberately conservative: when Skyrim groups ordinary and quest-bound copies under one
+inventory entry, all copies of that mapped base object stay Skyrim-side rather than risking a quest
+item.
+
+### Plugin-aware FormIDs
+
+Base-game absolute IDs still work:
+
+```json
+{
+  "skyrimFormId": "0005ACE4",
+  "minecraftItem": "minecraft:iron_ingot"
+}
+```
+
+DLC/mod mappings can instead identify the owning plugin and its local FormID:
+
+```json
+{
+  "skyrimPlugin": "SomePlugin.esp",
+  "skyrimLocalFormId": "00001234",
+  "minecraftItem": "minecraft:iron_ingot"
+}
+```
+
+SkyCraft resolves the runtime FormID from Skyrim's loaded plugin table, so the mapping is not tied to
+a particular load-order index. A mapping should use either the absolute base-game form or the
+plugin-aware pair, not both.
+
+No weapon/armor experiment is merged by this iteration. Those remain on their own branches until
+their end-to-end in-game tests pass.

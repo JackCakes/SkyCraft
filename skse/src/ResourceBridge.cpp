@@ -24,6 +24,7 @@ namespace skycraft::ResourceBridge
 			std::uint32_t itemHash{ 0 };
 			std::int32_t skyrimCount{ 1 };
 			std::int32_t minecraftCount{ 1 };
+			bool protectQuestItems{ true };
 		};
 
 		struct Pending
@@ -35,6 +36,7 @@ namespace skycraft::ResourceBridge
 			std::int32_t targetCount{ 0 };
 			std::int32_t skyrimPerGroup{ 1 };
 			std::int32_t minecraftPerGroup{ 1 };
+			bool protectQuestItems{ true };
 		};
 
 		Settings settings;
@@ -136,6 +138,56 @@ namespace skycraft::ResourceBridge
 			}
 		}
 
+
+		RE::TESBoundObject* ResolveMappedObject(const nlohmann::json& a_entry, RE::FormID& a_formId, std::string& a_source)
+		{
+			const bool hasPlugin = a_entry.contains("skyrimPlugin");
+			const bool hasLocal = a_entry.contains("skyrimLocalFormId");
+			if (hasPlugin || hasLocal) {
+				if (!hasPlugin || !hasLocal || !a_entry["skyrimPlugin"].is_string()) {
+					throw std::runtime_error("plugin-aware mapping needs both skyrimPlugin and skyrimLocalFormId");
+				}
+				const auto plugin = a_entry["skyrimPlugin"].get<std::string>();
+				RE::FormID localId = 0;
+				if (plugin.empty() || !ParseFormId(a_entry["skyrimLocalFormId"], localId)) {
+					throw std::runtime_error("bad plugin-aware form reference");
+				}
+				auto* data = RE::TESDataHandler::GetSingleton();
+				auto* object = data ? data->LookupForm<RE::TESBoundObject>(localId, plugin) : nullptr;
+				if (!object) {
+					throw std::runtime_error(fmt::format("couldn't resolve {:08X} from {}", localId, plugin));
+				}
+				a_formId = object->GetFormID();
+				a_source = fmt::format("{}:{:08X}", plugin, localId);
+				return object;
+			}
+
+			if (!a_entry.contains("skyrimFormId") || !ParseFormId(a_entry["skyrimFormId"], a_formId) || a_formId == 0) {
+				throw std::runtime_error("bad skyrimFormId");
+			}
+			auto* object = RE::TESForm::LookupByID<RE::TESBoundObject>(a_formId);
+			if (!object) {
+				throw std::runtime_error("Skyrim form doesn't exist");
+			}
+			a_source = fmt::format("{:08X}", a_formId);
+			return object;
+		}
+
+		bool IsQuestProtected(RE::PlayerCharacter* a_player, RE::TESBoundObject* a_item)
+		{
+			if (!a_player || !a_item) {
+				return false;
+			}
+			auto inventory = a_player->GetInventory([a_item](RE::TESBoundObject& a_object) {
+				return &a_object == a_item;
+			});
+			const auto found = inventory.find(a_item);
+			if (found == inventory.end() || !found->second.second) {
+				return false;
+			}
+			return found->second.second->IsQuestObject();
+		}
+
 		Settings LoadSettings()
 		{
 			Settings out;
@@ -174,9 +226,8 @@ namespace skycraft::ResourceBridge
 						continue;
 					}
 					RE::FormID formId = 0;
-					if (!entry.contains("skyrimFormId") || !ParseFormId(entry["skyrimFormId"], formId) || formId == 0) {
-						throw std::runtime_error("bad skyrimFormId");
-					}
+					std::string formSource;
+					auto* boundObject = ResolveMappedObject(entry, formId, formSource);
 					const auto minecraftItem = entry.value("minecraftItem", std::string{});
 					if (minecraftItem.empty() || minecraftItem.find(':') == std::string::npos) {
 						throw std::runtime_error("bad minecraftItem");
@@ -185,9 +236,6 @@ namespace skycraft::ResourceBridge
 					const auto minecraftCount = entry.value("minecraftCount", 1);
 					if (skyrimCount <= 0 || skyrimCount > 4096 || minecraftCount <= 0 || minecraftCount > kMaxMinecraftPerRequest) {
 						throw std::runtime_error("counts must be 1..4096");
-					}
-					if (!RE::TESForm::LookupByID<RE::TESBoundObject>(formId)) {
-						throw std::runtime_error("Skyrim form doesn't exist");
 					}
 					if (mappings.contains(formId)) {
 						throw std::runtime_error("duplicate skyrimFormId");
@@ -200,6 +248,7 @@ namespace skycraft::ResourceBridge
 					mapping.itemHash = ItemHash(minecraftItem);
 					mapping.skyrimCount = skyrimCount;
 					mapping.minecraftCount = minecraftCount;
+					mapping.protectQuestItems = entry.value("protectQuestItems", true);
 					mappings.emplace(formId, std::move(mapping));
 				} catch (const std::exception& e) {
 					++skipped;
@@ -290,7 +339,8 @@ namespace skycraft::ResourceBridge
 				a_sourceCount,
 				a_targetCount,
 				a_mapping.skyrimCount,
-				a_mapping.minecraftCount
+				a_mapping.minecraftCount,
+				a_mapping.protectQuestItems
 			});
 			BridgeInfo("progression bridge: requested {} x{} -> {} x{} (request {})",
 				a_mapping.name, a_sourceCount, a_mapping.minecraftItem, a_targetCount, requestId);
@@ -324,6 +374,11 @@ namespace skycraft::ResourceBridge
 					return RE::BSEventNotifyControl::kContinue;
 				}
 				const auto& mapping = found->second;
+				auto* mappedItem = RE::TESForm::LookupByID<RE::TESBoundObject>(mapping.formId);
+				if (mapping.protectQuestItems && IsQuestProtected(player, mappedItem)) {
+					BridgeInfo("progression bridge: kept quest-protected {} in Skyrim", mapping.name);
+					return RE::BSEventNotifyControl::kContinue;
+				}
 
 				// Every newly acquired mapped item becomes eligible. Incomplete ratio groups stay
 				// physically in Skyrim and carry across later pickups in this run.
@@ -371,7 +426,7 @@ namespace skycraft::ResourceBridge
 	void Install()
 	{
 		SetupProgressionLog();
-		BridgeInfo("SkyCraft progression 0.1.2-progression.4 starting");
+		BridgeInfo("SkyCraft progression 0.1.2-progression.5 starting");
 
 		settings = LoadSettings();
 		if (!settings.enabled) {
@@ -439,6 +494,12 @@ namespace skycraft::ResourceBridge
 		if (!player || !item) {
 			RestoreCarry(transfer, transfer.sourceCount);
 			BridgeWarn("progression bridge: couldn't remove acknowledged Skyrim item for request {}", requestId);
+			return true;
+		}
+
+		if (transfer.protectQuestItems && IsQuestProtected(player, item)) {
+			RestoreCarry(transfer, transfer.sourceCount);
+			BridgeWarn("progression bridge: request {} became quest-protected before acknowledgement; Skyrim source kept", requestId);
 			return true;
 		}
 
