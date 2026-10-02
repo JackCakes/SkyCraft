@@ -23,6 +23,10 @@ normal Minecraft saves/inventory moves and syncs to multiplayer clients.
 | Long | +0.50 entity reach |
 | Sturdy | +50% max durability |
 | Volatile | 10% chance on each hit to deal 3x final damage |
+| Deadly | +15% damage and +15% speed |
+| Flurried | -10% damage, +50% speed; dagger/sword only |
+| Berserker | +40% damage, -20% speed, +10% durability; greatsword/battleaxe only |
+| Giant | +20% damage, -10% speed, +0.75 reach; greatsword/battleaxe only |
 
 Static effects are per-stack Minecraft attribute/data-component overrides. Volatile is evaluated when
 damage reaches SkyCraft's Skyrim actor stand-in, after Minecraft has already applied normal weapon
@@ -34,7 +38,9 @@ On first run the Fabric side writes:
 
 `config/skycraft-weapon-affixes.json`
 
-The whole table is data-driven: roll chance, weights and numeric effects can be edited. Use
+The whole table is data-driven: roll chance, weights, numeric effects and an `allowedWeapons`
+pool can be edited. `["*"]` means every SkyCraft weapon; otherwise list registry paths such as
+`skyrim_iron_dagger` or `skyrim_iron_battleaxe`. Use
 `/skyaffixes reload` to reload the table for future drops; existing weapons keep the affix and
 numbers already baked into their ItemStack.
 
