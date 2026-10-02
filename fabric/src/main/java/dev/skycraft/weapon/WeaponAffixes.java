@@ -156,21 +156,21 @@ public final class WeaponAffixes {
             return Optional.empty();
         }
         if (random.nextDouble() >= config.rollChance) {
-            markNoAffix(stack);
+            markNoAffix(stack, sourceFormId);
             SkyCraft.LOG.info("SkyCraft affix: rolled no affix on {}", BuiltInRegistries.ITEM.getKey(stack.getItem()));
             return Optional.empty();
         }
 
         List<AffixDefinition> candidates = candidatesFor(stack);
         if (candidates.isEmpty()) {
-            markNoAffix(stack);
+            markNoAffix(stack, sourceFormId);
             return Optional.empty();
         }
 
         double total = 0.0;
         for (AffixDefinition def : candidates) total += def.weight;
         if (!(total > 0.0)) {
-            markNoAffix(stack);
+            markNoAffix(stack, sourceFormId);
             return Optional.empty();
         }
 
@@ -211,13 +211,14 @@ public final class WeaponAffixes {
         return !stored.isEmpty() && stored.getIntOr("v", 0) == FORMAT;
     }
 
-    private static void markNoAffix(ItemStack stack) {
+    private static void markNoAffix(ItemStack stack, int sourceFormId) {
         CompoundTag root = stack.has(DataComponents.CUSTOM_DATA)
             ? stack.get(DataComponents.CUSTOM_DATA).copyTag()
             : new CompoundTag();
         CompoundTag stored = new CompoundTag();
         stored.putInt("v", FORMAT);
         stored.putString("id", "none");
+        stored.putInt("sourceFormId", sourceFormId);
         root.put(ROOT, stored);
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(root));
     }
