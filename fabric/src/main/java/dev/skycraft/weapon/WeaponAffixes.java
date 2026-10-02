@@ -96,7 +96,12 @@ public final class WeaponAffixes {
                     ItemStack stack = player.getMainHandItem();
                     StoredAffix affix = readStored(stack).orElse(null);
                     if (affix == null) {
-                        player.sendSystemMessage(Component.literal("Held item has no SkyCraft affix."));
+                        int sourceFormId = sourceFormId(stack);
+                        player.sendSystemMessage(Component.literal(
+                            "Held item has no SkyCraft affix"
+                            + (sourceFormId != 0 ? String.format(" | Skyrim source %08X", sourceFormId) : "")
+                            + "."
+                        ));
                         return 0;
                     }
                     player.sendSystemMessage(Component.literal(
@@ -245,6 +250,15 @@ public final class WeaponAffixes {
             if (item != null && appliesToPath(def, path)) return item;
         }
         return null;
+    }
+
+    private static int sourceFormId(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return 0;
+        CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
+        if (custom == null) return 0;
+        CompoundTag stored = custom.copyTag().getCompoundOrEmpty(ROOT);
+        if (stored.isEmpty() || stored.getIntOr("v", 0) != FORMAT) return 0;
+        return stored.getIntOr("sourceFormId", 0);
     }
 
     private static Optional<StoredAffix> readStored(ItemStack stack) {

@@ -89,7 +89,8 @@ doing hundreds of manual drops.
 The experimental transfer now also carries Skyrim's `oldContainer` FormID for ordinary weapon
 pickups through the existing shared-memory input event (and through the multiplayer resource-transfer
 packet for guests). The raw source FormID is stored on the rolled Minecraft weapon and is visible in
-`/skyaffixes inspect` when nonzero.
+`/skyaffixes inspect` when nonzero. This provenance marker is kept even when that weapon's one-time
+roll produces no affix, so later source-aware loot rules do not lose where the item came from.
 
 This does not change affix odds yet. It is groundwork for later rules such as boss/chief loot having
 better affix pools or a weapon remembering which Skyrim actor/container it came from. Console-created
