@@ -23,6 +23,13 @@ jobs:
           distribution: temurin
           java-version: "25"
 
+      - name: Preflight Fabric compile
+        shell: pwsh
+        working-directory: fabric
+        run: |
+          .\gradlew.bat build --no-configuration-cache
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
       - name: Set up vcpkg
         shell: pwsh
         run: |
