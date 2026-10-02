@@ -161,12 +161,14 @@ namespace skycraft
 									if (IsSkyrimMenuKey(code)) {
 										break;  // MenuControls (see the hook below) opens Skyrim's menu
 									}
-									if (code == kDikG || code == kDikH || code == kDikO) {
+									if (code == kDikG || code == kDikH || code == kDikO || code == kDikF8) {
 										if (down) {
 											if (code == kDikG) {
 												ActivateSkyrimTarget();
 											} else if (code == kDikH) {
 												OpenWaitMenu();
+											} else if (code == kDikF8) {
+												OpenSkyrimInventory();
 											} else {
 												Input::ReleaseAll();
 												link.PushInput(proto::kInOpenMenu, 0);
