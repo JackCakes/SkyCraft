@@ -651,6 +651,86 @@
       "protectQuestItems": true,
       "ordinaryWeaponOnly": true,
       "enabled": true
+    },
+    {
+      "name": "Elven Dagger",
+      "skyrimFormId": "0001399E",
+      "minecraftItem": "skycraft:skyrim_elven_dagger",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Elven Sword",
+      "skyrimFormId": "000139A1",
+      "minecraftItem": "skycraft:skyrim_elven_sword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Elven War Axe",
+      "skyrimFormId": "0001399B",
+      "minecraftItem": "skycraft:skyrim_elven_war_axe",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Elven Mace",
+      "skyrimFormId": "000139A0",
+      "minecraftItem": "skycraft:skyrim_elven_mace",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Elven Greatsword",
+      "skyrimFormId": "0001399F",
+      "minecraftItem": "skycraft:skyrim_elven_greatsword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Elven Battleaxe",
+      "skyrimFormId": "0001399C",
+      "minecraftItem": "skycraft:skyrim_elven_battleaxe",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Elven Warhammer",
+      "skyrimFormId": "000139A2",
+      "minecraftItem": "skycraft:skyrim_elven_warhammer",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Elven Bow",
+      "skyrimFormId": "0001399D",
+      "minecraftItem": "skycraft:skyrim_elven_bow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
     }
   ]
 }
