@@ -206,13 +206,9 @@ namespace skycraft
 		if (!Valid() || !HostAlive()) {
 			return;
 		}
-		for (int attempt = 0; attempt < 100; ++attempt) {
-			if (WriteCollision(skateproto::kColClear, &a_epoch, sizeof(a_epoch))) {
-				return;
-			}
-			std::this_thread::sleep_for(1ms);
+		if (!WriteCollision(skateproto::kColClear, &a_epoch, sizeof(a_epoch))) {
+			logger::warn("Skate bridge: collision ring full; dropped clear epoch {}", a_epoch);
 		}
-		logger::warn("Skate bridge: collision ring full; dropped clear epoch {}", a_epoch);
 	}
 
 	void SkateBridge::WriteRegion(
@@ -247,20 +243,23 @@ namespace skycraft
 				std::size_t(a_count) * sizeof(skateproto::ColTri));
 		}
 
-		for (int attempt = 0; attempt < 100; ++attempt) {
-			if (WriteCollision(
-					skateproto::kColRegionTris,
-					payload.data(),
-					static_cast<std::uint32_t>(payload.size()))) {
-				return;
+		if (!WriteCollision(
+				skateproto::kColRegionTris,
+				payload.data(),
+				static_cast<std::uint32_t>(payload.size()))) {
+			// Optional consumer: never block the existing SkyCraft collision worker.
+			// Nearby regions refresh naturally, and a restarted host gets a fresh epoch.
+			static std::atomic<std::uint32_t> dropped{ 0 };
+			const auto n = dropped.fetch_add(1, std::memory_order_relaxed) + 1;
+			if (n <= 5 || n % 100 == 0) {
+				logger::warn(
+					"Skate bridge: collision ring full; dropped region ({},{},{}) epoch {} ({} total)",
+					a_rx,
+					a_ry,
+					a_rz,
+					a_epoch,
+					n);
 			}
-			std::this_thread::sleep_for(1ms);
 		}
-		logger::warn(
-			"Skate bridge: collision ring full; dropped region ({},{},{}) epoch {}",
-			a_rx,
-			a_ry,
-			a_rz,
-			a_epoch);
 	}
 }
