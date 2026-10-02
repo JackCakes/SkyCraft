@@ -50,6 +50,9 @@ namespace skycraft
 
 		float lookDx = 0.0f;
 		float lookDy = 0.0f;
+		// Keyboard fallback for the external Skate host. Input events and
+		// Game::PerFrame run on Skyrim's main thread, so no extra locking is needed.
+		std::array<bool, 256> skateKeys{};
 
 		// G on something Skyrim can activate (door, NPC, container, item, furniture) activates it in
 		// Skyrim. Furniture (chairs, beds, crafting stations, pull-bar levers) hands the player to
@@ -132,10 +135,16 @@ namespace skycraft
 							auto* button = e->AsButtonEvent();
 							const bool down = button->IsDown();
 							const bool up = button->IsUp();
+							const auto code = button->GetIDCode();
+							if ((down || up) && button->GetDevice() == RE::INPUT_DEVICE::kKeyboard) {
+								const bool capture = (st.puppeting || st.skateOwnsPlayer) && !menuOpen && !st.mcScreenOpen;
+								if (capture || up) {
+									skateKeys[code & 0xFF] = capture && down;
+								}
+							}
 							if (!route || (!down && !up)) {
 								break;
 							}
-							const auto code = button->GetIDCode();
 							if (button->GetDevice() == RE::INPUT_DEVICE::kKeyboard) {
 								// With a Minecraft screen up (chat, inventory, options) every key is
 								// Minecraft's, so typing works and Esc closes the screen.
@@ -272,9 +281,44 @@ namespace skycraft
 			lookDx = lookDy = 0.0f;
 		}
 
+		void SampleSkateInput(skateproto::InputState& a_out, float a_frameSeconds)
+		{
+			a_out = {};
+			a_out.flags = skateproto::kInputValid | skateproto::kInputKeyboardFallback;
+			static std::uint32_t packet = 0;
+			a_out.packet = ++packet;
+			a_out.frameSeconds = std::clamp(a_frameSeconds, 0.0f, 0.1f);
+
+			auto down = [](std::uint32_t a_dik) { return skateKeys[a_dik & 0xFF]; };
+			auto axis = [&](std::uint32_t a_negative, std::uint32_t a_positive) -> std::int16_t {
+				const int v = (down(a_positive) ? 32767 : 0) - (down(a_negative) ? 32767 : 0);
+				return static_cast<std::int16_t>(v);
+			};
+
+			// DirectInput scan codes. Keep the mapping explicit: this is only a
+			// keyboard fallback around the XInput-shaped transport.
+			constexpr std::uint32_t kW = 0x11, kA = 0x1E, kS = 0x1F, kD = 0x20;
+			constexpr std::uint32_t kQ = 0x10, kE = 0x12, kR = 0x13;
+			constexpr std::uint32_t kCtrl = 0x1D, kShift = 0x2A, kSpace = 0x39;
+			constexpr std::uint32_t kLeft = 0xCB, kRight = 0xCD, kUp = 0xC8, kDown = 0xD0;
+
+			a_out.left[0] = axis(kA, kD);
+			a_out.left[1] = axis(kS, kW);
+			a_out.right[0] = axis(kLeft, kRight);
+			a_out.right[1] = axis(kDown, kUp);
+			a_out.triggers[0] = down(kQ) ? 255 : 0;
+			a_out.triggers[1] = down(kE) ? 255 : 0;
+
+			if (down(kSpace)) a_out.buttons |= 0x1000;  // Xbox A / South
+			if (down(kCtrl))  a_out.buttons |= 0x2000;  // Xbox B / East
+			if (down(kShift)) a_out.buttons |= 0x4000;  // Xbox X / West
+			if (down(kR))     a_out.buttons |= 0x8000;  // Xbox Y / North
+		}
+
 		void ReleaseAll()
 		{
 			Link::Get().PushInput(proto::kInReleaseAll, 0);
+			skateKeys.fill(false);
 		}
 
 		void SetActivatePromptKey(bool a_minecraftControls)
