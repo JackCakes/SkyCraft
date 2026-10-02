@@ -49,6 +49,7 @@ namespace skycraft::skateproto
 		kHostGrinding = 1u << 4,
 		kHostManual = 1u << 5,
 		kHostBail = 1u << 6,
+		kHostCameraValid = 1u << 7,
 	};
 
 	struct Header
