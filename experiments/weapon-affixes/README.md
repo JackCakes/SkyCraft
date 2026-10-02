@@ -87,8 +87,10 @@ doing hundreds of manual drops.
 ## Skyrim loot provenance
 
 The experimental transfer now also carries Skyrim's `oldContainer` FormID for ordinary weapon
-pickups through the existing shared-memory input event (and through the multiplayer resource-transfer
-packet for guests). The raw source FormID is stored on the rolled Minecraft weapon and is visible in
+pickups. Because SkyCraft's existing input event has only a 16-bit `code` field, provenance uses a
+new protocol-v14 metadata event keyed by the 32-bit transfer request id, followed by the unchanged
+resource-transfer event. Multiplayer then forwards the same full FormID in the resource-transfer
+packet for guests. The raw source FormID is stored on the rolled Minecraft weapon and is visible in
 `/skyaffixes inspect` when nonzero. This provenance marker is kept even when that weapon's one-time
 roll produces no affix, so later source-aware loot rules do not lose where the item came from.
 

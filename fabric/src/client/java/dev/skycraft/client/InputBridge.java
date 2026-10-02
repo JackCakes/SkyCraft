@@ -4,6 +4,8 @@ import dev.skycraft.combat.SkyCombat;
 import dev.skycraft.link.Proto;
 import dev.skycraft.link.SkyLink;
 import dev.skycraft.progression.ResourceBridge;
+import java.util.HashMap;
+import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.server.level.ServerPlayer;
@@ -21,6 +23,7 @@ public final class InputBridge {
 	private static double cursorX, cursorY;
 	private static int modifiers;
 	private static int clickLogs;
+	private static final Map<Integer, Integer> RESOURCE_SOURCE_BY_REQUEST = new HashMap<>();
 
 	private InputBridge() {
 	}
@@ -64,7 +67,8 @@ public final class InputBridge {
 			}
 			case Proto.IN_RELEASE_ALL -> releaseAll();
 			case Proto.IN_HURT -> hurt(minecraft, code, a / 100.0F, b, c);
-			case Proto.IN_RESOURCE_TRANSFER -> transferResource(minecraft, code, a, b, c);
+			case Proto.IN_RESOURCE_TRANSFER_SOURCE -> rememberResourceSource(a, b);
+			case Proto.IN_RESOURCE_TRANSFER -> transferResource(minecraft, a, b, c);
 			case Proto.IN_OPEN_MENU -> {
 				if (minecraft.gui.screen() == null && minecraft.player != null) {
 					releaseAll();
@@ -99,8 +103,19 @@ public final class InputBridge {
 	}
 
 
+	private static void rememberResourceSource(int requestId, int sourceFormId) {
+		if (requestId == 0 || sourceFormId == 0) return;
+		if (RESOURCE_SOURCE_BY_REQUEST.size() >= 1024) {
+			RESOURCE_SOURCE_BY_REQUEST.clear();
+			dev.skycraft.SkyCraft.LOG.warn("SkyCraft progression: cleared stale resource-source metadata");
+		}
+		RESOURCE_SOURCE_BY_REQUEST.put(requestId, sourceFormId);
+	}
+
 	/** Skyrim acquired a mapped item. Grant it on the authoritative Minecraft server. */
-	private static void transferResource(Minecraft minecraft, int sourceFormId, int requestId, int count, int itemHash) {
+	private static void transferResource(Minecraft minecraft, int requestId, int count, int itemHash) {
+		Integer source = RESOURCE_SOURCE_BY_REQUEST.remove(requestId);
+		int sourceFormId = source != null ? source : 0;
 		if (minecraft.player == null || count <= 0) {
 			resourceAck(requestId, itemHash, 0);
 			return;

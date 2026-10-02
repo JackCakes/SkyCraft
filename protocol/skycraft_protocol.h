@@ -13,7 +13,7 @@
 namespace skycraft::proto
 {
 	inline constexpr std::uint32_t kMagic = 0x43594B53;  // "SKYC"
-	inline constexpr std::uint32_t kVersion = 13;
+	inline constexpr std::uint32_t kVersion = 14;
 	inline constexpr wchar_t       kMappingName[] = L"Local\\SkyCraft_v1";
 
 	// 1 Minecraft block == 70 Skyrim units (Skyrim player ~128 units tall, MC player 1.8 blocks).
@@ -182,6 +182,8 @@ namespace skycraft::proto
 		kInOpenMenu = 8,     // open Minecraft's pause/options menu
 		kInResourceTransfer = 9,  // universal mapping: a = request id, b = Minecraft output count,
 		                          // c = FNV-1a 32-bit hash of the Minecraft registry id; code reserved
+		kInResourceTransferSource = 10, // optional metadata immediately before transfer:
+		                                // a = request id, b = full 32-bit Skyrim oldContainer FormID
 	};
 
 	enum HurtKind : std::uint16_t

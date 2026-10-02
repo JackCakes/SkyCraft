@@ -339,9 +339,20 @@ namespace skycraft::ResourceBridge
 			}
 
 			const auto requestId = NewRequestId();
+			// InputEvent::code is only 16 bits, so full Skyrim FormIDs travel in a small
+			// metadata event keyed by request id. Older consumers safely ignore type 10.
+			if (a_sourceFormId != 0 && !Link::Get().PushInput(
+					proto::kInResourceTransferSource,
+					0,
+					static_cast<std::int32_t>(requestId),
+					static_cast<std::int32_t>(a_sourceFormId),
+					0)) {
+				BridgeWarn("weapon bridge: input ring full while sending loot source; leaving Skyrim item untouched");
+				return false;
+			}
 			if (!Link::Get().PushInput(
 					proto::kInResourceTransfer,
-					static_cast<std::int32_t>(a_sourceFormId),
+					0,
 					static_cast<std::int32_t>(requestId),
 					a_targetCount,
 					static_cast<std::int32_t>(a_mapping.itemHash))) {
