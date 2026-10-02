@@ -2,6 +2,7 @@ package dev.skycraft.weapon;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import dev.skycraft.SkyCraft;
 import java.io.IOException;
@@ -75,6 +76,23 @@ public final class WeaponAffixes {
                     player.sendSystemMessage(Component.literal("Added 12 independently rolled SkyCraft Iron Swords."));
                     return 1;
                 }))
+                .then(Commands.literal("simulate")
+                    .then(Commands.argument("level", IntegerArgumentType.integer(0, 65535)).executes(context -> {
+                        ServerPlayer player = context.getSource().getPlayerOrException();
+                        int level = IntegerArgumentType.getInteger(context, "level");
+                        Item item = SkyrimWeapons.byId("skyrim_iron_sword");
+                        if (item == null) {
+                            player.sendSystemMessage(Component.literal("SkyCraft affix simulation unavailable: iron sword is not registered."));
+                            return 0;
+                        }
+                        for (int i = 0; i < 16; i++) {
+                            ItemStack stack = new ItemStack(item);
+                            roll(stack, player.getRandom(), 0, 0, level);
+                            player.getInventory().add(stack);
+                        }
+                        player.sendSystemMessage(Component.literal("Added 16 simulated level-" + level + " Skyrim loot swords."));
+                        return 1;
+                    })))
                 .then(Commands.literal("give")
                     .then(Commands.argument("id", StringArgumentType.word()).executes(context -> {
                         ServerPlayer player = context.getSource().getPlayerOrException();
