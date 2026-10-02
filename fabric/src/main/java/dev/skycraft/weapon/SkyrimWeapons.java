@@ -45,6 +45,13 @@ public final class SkyrimWeapons {
         DEFAULTS.put("skyrim_iron_sword", new Stats(6.0, 1.6, 2.5, 200));
         DEFAULTS.put("skyrim_iron_greatsword", new Stats(11.0, 1.0, 3.0, 350));
         DEFAULTS.put("skyrim_iron_battleaxe", new Stats(12.0, 0.9, 3.0, 400));
+        DEFAULTS.put("skyrim_dwarven_dagger", new Stats(6.0, 2.0, 1.8, 300));
+        DEFAULTS.put("skyrim_dwarven_sword", new Stats(8.0, 1.6, 2.5, 400));
+        DEFAULTS.put("skyrim_dwarven_war_axe", new Stats(9.0, 1.4, 2.5, 450));
+        DEFAULTS.put("skyrim_dwarven_mace", new Stats(10.0, 1.2, 2.5, 500));
+        DEFAULTS.put("skyrim_dwarven_greatsword", new Stats(13.0, 1.0, 3.0, 550));
+        DEFAULTS.put("skyrim_dwarven_battleaxe", new Stats(14.0, 0.9, 3.0, 600));
+        DEFAULTS.put("skyrim_dwarven_warhammer", new Stats(15.0, 0.8, 3.0, 650));
     }
 
     private SkyrimWeapons() {}
@@ -72,7 +79,7 @@ public final class SkyrimWeapons {
                             player.getInventory().add(new ItemStack(item));
                         }
                     }
-                    player.sendSystemMessage(Component.literal("SkyCraft weapon test kit added: dagger, sword, greatsword, battleaxe."));
+                    player.sendSystemMessage(Component.literal("SkyCraft weapon test kit added: " + DEFAULTS.size() + " weapons across Iron and Dwarven tiers."));
                     return 1;
                 })));
         });
