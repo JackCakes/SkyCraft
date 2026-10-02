@@ -11,6 +11,7 @@
       "durabilityMultiplier": 1.0,
       "procChance": 0.0,
       "procDamageMultiplier": 1.0,
+      "allowedWeapons": ["*"],
       "enabled": true
     },
     {
@@ -23,6 +24,7 @@
       "durabilityMultiplier": 1.0,
       "procChance": 0.0,
       "procDamageMultiplier": 1.0,
+      "allowedWeapons": ["skyrim_iron_dagger", "skyrim_iron_sword"],
       "enabled": true
     },
     {
@@ -35,6 +37,7 @@
       "durabilityMultiplier": 1.0,
       "procChance": 0.0,
       "procDamageMultiplier": 1.0,
+      "allowedWeapons": ["skyrim_iron_sword", "skyrim_iron_greatsword"],
       "enabled": true
     },
     {
@@ -47,6 +50,7 @@
       "durabilityMultiplier": 1.50,
       "procChance": 0.0,
       "procDamageMultiplier": 1.0,
+      "allowedWeapons": ["*"],
       "enabled": true
     },
     {
@@ -59,6 +63,59 @@
       "durabilityMultiplier": 1.0,
       "procChance": 0.10,
       "procDamageMultiplier": 3.0,
+      "allowedWeapons": ["*"],
+      "enabled": true
+    },
+    {
+      "id": "deadly",
+      "displayName": "Deadly",
+      "weight": 12,
+      "damageMultiplier": 1.15,
+      "attackSpeedMultiplier": 1.15,
+      "reachAdd": 0.0,
+      "durabilityMultiplier": 1.0,
+      "procChance": 0.0,
+      "procDamageMultiplier": 1.0,
+      "allowedWeapons": ["*"],
+      "enabled": true
+    },
+    {
+      "id": "flurried",
+      "displayName": "Flurried",
+      "weight": 10,
+      "damageMultiplier": 0.90,
+      "attackSpeedMultiplier": 1.50,
+      "reachAdd": 0.0,
+      "durabilityMultiplier": 1.0,
+      "procChance": 0.0,
+      "procDamageMultiplier": 1.0,
+      "allowedWeapons": ["skyrim_iron_dagger", "skyrim_iron_sword"],
+      "enabled": true
+    },
+    {
+      "id": "berserker",
+      "displayName": "Berserker",
+      "weight": 10,
+      "damageMultiplier": 1.40,
+      "attackSpeedMultiplier": 0.80,
+      "reachAdd": 0.0,
+      "durabilityMultiplier": 1.10,
+      "procChance": 0.0,
+      "procDamageMultiplier": 1.0,
+      "allowedWeapons": ["skyrim_iron_greatsword", "skyrim_iron_battleaxe"],
+      "enabled": true
+    },
+    {
+      "id": "giant",
+      "displayName": "Giant",
+      "weight": 8,
+      "damageMultiplier": 1.20,
+      "attackSpeedMultiplier": 0.90,
+      "reachAdd": 0.75,
+      "durabilityMultiplier": 1.0,
+      "procChance": 0.0,
+      "procDamageMultiplier": 1.0,
+      "allowedWeapons": ["skyrim_iron_greatsword", "skyrim_iron_battleaxe"],
       "enabled": true
     }
   ]
