@@ -19,8 +19,21 @@ jobs:
           .\.tools\vcpkg\bootstrap-vcpkg.bat
 
       - name: Configure SKSE
+        shell: pwsh
         working-directory: skse
-        run: cmake --preset default
+        run: |
+          for ($attempt = 1; $attempt -le 5; $attempt++) {
+            cmake --preset default
+            if ($LASTEXITCODE -eq 0) {
+              exit 0
+            }
+            if ($attempt -lt 5) {
+              $delay = 10 * $attempt
+              Write-Host "Configure failed (attempt $attempt/5); retrying transient dependency downloads in $delay seconds..."
+              Start-Sleep -Seconds $delay
+            }
+          }
+          exit 1
 
       - name: Build SKSE
         working-directory: skse
