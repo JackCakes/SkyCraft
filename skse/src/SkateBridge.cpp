@@ -90,6 +90,17 @@ namespace skycraft
 		header->skyrimHeartbeatMs = ::GetTickCount64();
 		Atomic(header->magic).store(skateproto::kMagic, std::memory_order_release);
 
+		// Present/player updates can stop while Skyrim is minimized or Alt-Tabbed.
+		// Keep this process-liveness heartbeat independent of the render/game loop so
+		// the external Skate host does not tear down and reconnect just because the
+		// player is looking at another window.
+		heartbeatThread_ = std::jthread([this](std::stop_token a_stop) {
+			while (!a_stop.stop_requested()) {
+				Heartbeat();
+				std::this_thread::sleep_for(std::chrono::milliseconds(500));
+			}
+		});
+
 		logger::info("Skate bridge shared memory {} ({} MB, {})", "Local\\SkyCraftSkate_v1", size >> 20, created == ERROR_ALREADY_EXISTS ? "reused" : "created");
 		return true;
 	}
