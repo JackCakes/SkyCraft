@@ -52,6 +52,14 @@ public final class SkyrimWeapons {
         DEFAULTS.put("skyrim_steel_greatsword", new Stats(11.5, 1.0, 3.0, 375));
         DEFAULTS.put("skyrim_steel_battleaxe", new Stats(12.5, 0.9, 3.0, 425));
         DEFAULTS.put("skyrim_steel_warhammer", new Stats(13.5, 0.8, 3.1, 450));
+        DEFAULTS.put("skyrim_dwarven_dagger", new Stats(5.0, 2.0, 1.8, 225));
+        DEFAULTS.put("skyrim_dwarven_sword", new Stats(7.0, 1.6, 2.5, 275));
+        DEFAULTS.put("skyrim_dwarven_war_axe", new Stats(8.0, 1.3, 2.4, 300));
+        DEFAULTS.put("skyrim_dwarven_mace", new Stats(9.0, 1.1, 2.3, 325));
+        DEFAULTS.put("skyrim_dwarven_greatsword", new Stats(12.0, 1.0, 3.0, 425));
+        DEFAULTS.put("skyrim_dwarven_battleaxe", new Stats(13.0, 0.9, 3.0, 475));
+        DEFAULTS.put("skyrim_dwarven_warhammer", new Stats(14.0, 0.8, 3.1, 500));
+        DEFAULTS.put("skyrim_dwarven_bow", new Stats(6.0, 1.2, 4.0, 350));
     }
 
     private SkyrimWeapons() {}

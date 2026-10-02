@@ -571,6 +571,86 @@
       "protectQuestItems": true,
       "ordinaryWeaponOnly": true,
       "enabled": true
+    },
+    {
+      "name": "Dwarven Dagger",
+      "skyrimFormId": "00013996",
+      "minecraftItem": "skycraft:skyrim_dwarven_dagger",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Dwarven Sword",
+      "skyrimFormId": "00013999",
+      "minecraftItem": "skycraft:skyrim_dwarven_sword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Dwarven War Axe",
+      "skyrimFormId": "00013993",
+      "minecraftItem": "skycraft:skyrim_dwarven_war_axe",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Dwarven Mace",
+      "skyrimFormId": "00013998",
+      "minecraftItem": "skycraft:skyrim_dwarven_mace",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Dwarven Greatsword",
+      "skyrimFormId": "00013997",
+      "minecraftItem": "skycraft:skyrim_dwarven_greatsword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Dwarven Battleaxe",
+      "skyrimFormId": "00013994",
+      "minecraftItem": "skycraft:skyrim_dwarven_battleaxe",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Dwarven Warhammer",
+      "skyrimFormId": "0001399A",
+      "minecraftItem": "skycraft:skyrim_dwarven_warhammer",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Dwarven Bow",
+      "skyrimFormId": "00013995",
+      "minecraftItem": "skycraft:skyrim_dwarven_bow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
     }
   ]
 }
