@@ -13,7 +13,7 @@
 namespace skycraft::proto
 {
 	inline constexpr std::uint32_t kMagic = 0x43594B53;  // "SKYC"
-	inline constexpr std::uint32_t kVersion = 11;
+	inline constexpr std::uint32_t kVersion = 12;
 	inline constexpr wchar_t       kMappingName[] = L"Local\\SkyCraft_v1";
 
 	// 1 Minecraft block == 70 Skyrim units (Skyrim player ~128 units tall, MC player 1.8 blocks).
@@ -180,6 +180,7 @@ namespace skycraft::proto
 		kInReleaseAll = 6,   // release every held key/button (input focus left MC)
 		kInHurt = 7,         // Skyrim hit the player: code = HurtKind, a = Skyrim damage * 100, b = attacker FormID, c = HurtFlags
 		kInOpenMenu = 8,     // open Minecraft's pause/options menu
+		kInResourceTransfer = 9,  // code = ResourceKind, a = request id, b = count, c = Skyrim item FormID
 	};
 
 	enum HurtKind : std::uint16_t
@@ -194,6 +195,13 @@ namespace skycraft::proto
 	{
 		kHurtBlockedInSkyrim = 1u << 0,
 		kHurtPowerAttack = 1u << 1,
+	};
+
+	// Skyrim crafting resources that can be transferred into the real Minecraft inventory.
+	enum ResourceKind : std::uint16_t
+	{
+		kResourceIronIngot = 1,
+		kResourceGoldIngot = 2,
 	};
 
 	// ---- actor table @0x12000 (Skyrim -> MC, seqlock) ----------------------------------------
@@ -247,6 +255,7 @@ namespace skycraft::proto
 		                    // flags = flight pitch (float bits), weapon = arrow texture (0 plain, 1 tipped, 2 spectral)
 		kEvSkillUse = 5,    // the player used a Skyrim skill in Minecraft: formId = Skyrim skill (ActorValue: 9 Block,
 		                    // 10 Smithing, 11 Heavy Armor, 12 Light Armor), a = uses (as Skyrim's AdvanceSkill counts them)
+		kEvResourceTransferAck = 6,  // formId = Skyrim item, a = accepted count, flags = request id, weapon = ResourceKind
 	};
 
 	enum HitFlags : std::uint32_t
