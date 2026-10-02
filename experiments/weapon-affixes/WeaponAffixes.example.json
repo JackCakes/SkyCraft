@@ -1,0 +1,65 @@
+{
+  "rollChance": 0.70,
+  "affixes": [
+    {
+      "id": "brutal",
+      "displayName": "Brutal",
+      "weight": 25,
+      "damageMultiplier": 1.25,
+      "attackSpeedMultiplier": 1.0,
+      "reachAdd": 0.0,
+      "durabilityMultiplier": 1.0,
+      "procChance": 0.0,
+      "procDamageMultiplier": 1.0,
+      "enabled": true
+    },
+    {
+      "id": "swift",
+      "displayName": "Swift",
+      "weight": 25,
+      "damageMultiplier": 1.0,
+      "attackSpeedMultiplier": 1.30,
+      "reachAdd": 0.0,
+      "durabilityMultiplier": 1.0,
+      "procChance": 0.0,
+      "procDamageMultiplier": 1.0,
+      "enabled": true
+    },
+    {
+      "id": "long",
+      "displayName": "Long",
+      "weight": 15,
+      "damageMultiplier": 1.0,
+      "attackSpeedMultiplier": 1.0,
+      "reachAdd": 0.50,
+      "durabilityMultiplier": 1.0,
+      "procChance": 0.0,
+      "procDamageMultiplier": 1.0,
+      "enabled": true
+    },
+    {
+      "id": "sturdy",
+      "displayName": "Sturdy",
+      "weight": 15,
+      "damageMultiplier": 1.0,
+      "attackSpeedMultiplier": 1.0,
+      "reachAdd": 0.0,
+      "durabilityMultiplier": 1.50,
+      "procChance": 0.0,
+      "procDamageMultiplier": 1.0,
+      "enabled": true
+    },
+    {
+      "id": "volatile",
+      "displayName": "Volatile",
+      "weight": 20,
+      "damageMultiplier": 1.0,
+      "attackSpeedMultiplier": 1.0,
+      "reachAdd": 0.0,
+      "durabilityMultiplier": 1.0,
+      "procChance": 0.10,
+      "procDamageMultiplier": 3.0,
+      "enabled": true
+    }
+  ]
+}

@@ -68,6 +68,9 @@ public final class ResourceBridge {
 			// constructing a 64-count weapon stack would create invalid inventory state.
 			int chunk = Math.min(remaining, Math.max(1, item.getDefaultMaxStackSize()));
 			ItemStack stack = new ItemStack(item, chunk);
+			if (chunk == 1 && dev.skycraft.weapon.WeaponAffixes.isEligible(stack)) {
+				dev.skycraft.weapon.WeaponAffixes.roll(stack, player.getRandom());
+			}
 			player.getInventory().add(stack);
 			int overflow = stack.getCount();
 			accepted += chunk - overflow;

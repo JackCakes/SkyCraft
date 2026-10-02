@@ -91,6 +91,15 @@ public class SkyrimActorEntity extends LivingEntity {
 		if (this.isInvulnerableTo(level, source) || dmg <= 0.0F) {
 			return;
 		}
+		ItemStack affixWeapon = source.getWeaponItem();
+		if (affixWeapon == null && source.getEntity() instanceof LivingEntity attacker) {
+			affixWeapon = attacker.getMainHandItem();
+		}
+		float affixMultiplier = dev.skycraft.weapon.WeaponAffixes.rollHitDamageMultiplier(affixWeapon, this.getRandom());
+		if (affixMultiplier != 1.0F) {
+			dmg *= affixMultiplier;
+			dev.skycraft.SkyCraft.LOG.info("SkyCraft affix proc: {}x damage on {}", affixMultiplier, this.getName().getString());
+		}
 		this.pendingDamage += dmg;
 		if (source.getDirectEntity() instanceof Projectile) {
 			this.pendingFlags |= Proto.HIT_PROJECTILE;

@@ -22,6 +22,7 @@ public final class SkyCraft implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		dev.skycraft.weapon.SkyrimWeapons.init();
+		dev.skycraft.weapon.WeaponAffixes.init();
 		SkyCombat.init();
 		dev.skycraft.net.SkyNet.init();
 		dev.skycraft.world.SkyDig.init();

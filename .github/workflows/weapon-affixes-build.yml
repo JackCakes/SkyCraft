@@ -1,0 +1,44 @@
+name: Build weapon affix experiment
+
+on:
+  push:
+    branches:
+      - experimental/weapon-affixes
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+      - name: Preflight Fabric compile
+        shell: pwsh
+        working-directory: fabric
+        run: |
+          .\gradlew.bat build --no-configuration-cache
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Set up vcpkg
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://github.com/microsoft/vcpkg .tools/vcpkg
+          .\.tools\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Build and package MO2 release
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File tools\package.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SkyCraft-weapon-affixes
+          path: |
+            dist/SkyCraft-*.zip
+            dist/skycraft-fabric-*.jar
+          if-no-files-found: error
