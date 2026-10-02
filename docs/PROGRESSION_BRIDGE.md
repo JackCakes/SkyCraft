@@ -104,3 +104,18 @@ new resolver without requiring any DLC or third-party mod. Adding a Skyrim Carro
 produce a Minecraft Carrot exactly as it did in progression.4.
 
 The loader rejects ambiguous entries that specify both `skyrimFormId` and the plugin-aware pair.
+
+
+## progression.6 equipment promotion
+
+The user-tested ordinary weapon bridge is now part of the main progression line. Iron Dagger, Iron
+Sword, Iron Greatsword and Iron Battleaxe are registered Minecraft items with editable
+damage/speed/reach/durability and custom 2D sprites. Skyrim pickup conversion uses ACK-before-remove.
+
+Weapon mappings set `ordinaryWeaponOnly: true`. Quest, equipped, favorited, enchanted, tempered,
+poisoned, renamed, stolen/owned, charged, or otherwise special instances stay in Skyrim. If any copy
+of the same base weapon is special, that base form stays Skyrim-side rather than risk deleting the
+wrong instance.
+
+Progression v6 is the active line for the remaining Skyrim weapon material families and ordinary
+armor. Balance is provisional; feature coverage is the current priority.

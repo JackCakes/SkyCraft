@@ -25,6 +25,7 @@ namespace skycraft::ResourceBridge
 			std::int32_t skyrimCount{ 1 };
 			std::int32_t minecraftCount{ 1 };
 			bool protectQuestItems{ true };
+			bool ordinaryWeaponOnly{ false };
 		};
 
 		struct Pending
@@ -37,6 +38,7 @@ namespace skycraft::ResourceBridge
 			std::int32_t skyrimPerGroup{ 1 };
 			std::int32_t minecraftPerGroup{ 1 };
 			bool protectQuestItems{ true };
+			bool ordinaryWeaponOnly{ false };
 		};
 
 		Settings settings;
@@ -192,6 +194,60 @@ namespace skycraft::ResourceBridge
 			return found->second.second->IsQuestObject();
 		}
 
+
+		bool HasUnsafeWeaponExtra(const RE::ExtraDataList* a_list)
+		{
+			if (!a_list) {
+				return false;
+			}
+			return a_list->HasType<RE::ExtraEnchantment>() ||
+			       a_list->HasType<RE::ExtraHealth>() ||
+			       a_list->HasType<RE::ExtraPoison>() ||
+			       a_list->HasType<RE::ExtraTextDisplayData>() ||
+			       a_list->HasType<RE::ExtraOwnership>() ||
+			       a_list->HasType<RE::ExtraWorn>() ||
+			       a_list->HasType<RE::ExtraWornLeft>() ||
+			       a_list->HasType<RE::ExtraHotkey>() ||
+			       a_list->HasType<RE::ExtraCharge>();
+		}
+
+		std::int32_t OrdinaryWeaponCount(RE::PlayerCharacter* a_player, RE::TESBoundObject* a_item)
+		{
+			if (!a_player || !a_item || a_item->GetFormType() != RE::FormType::Weapon) {
+				return 0;
+			}
+
+			if (const auto* enchantable = a_item->As<RE::TESEnchantableForm>();
+			    enchantable && enchantable->formEnchanting) {
+				return 0;
+			}
+
+			auto inventory = a_player->GetInventory([a_item](RE::TESBoundObject& a_object) {
+				return &a_object == a_item;
+			});
+			const auto found = inventory.find(a_item);
+			if (found == inventory.end() || found->second.first <= 0) {
+				return 0;
+			}
+
+			auto* entry = found->second.second.get();
+			if (!entry) {
+				return found->second.first;
+			}
+
+			if (entry->IsQuestObject() || entry->IsFavorited() || entry->IsWorn()) {
+				return 0;
+			}
+			if (entry->extraLists) {
+				for (const auto* xList : *entry->extraLists) {
+					if (HasUnsafeWeaponExtra(xList)) {
+						return 0;
+					}
+				}
+			}
+			return found->second.first;
+		}
+
 		Settings LoadSettings()
 		{
 			Settings out;
@@ -231,7 +287,7 @@ namespace skycraft::ResourceBridge
 					}
 					RE::FormID formId = 0;
 					std::string formSource;
-					ResolveMappedObject(entry, formId, formSource);
+					auto* boundObject = ResolveMappedObject(entry, formId, formSource);
 					const auto minecraftItem = entry.value("minecraftItem", std::string{});
 					if (minecraftItem.empty() || minecraftItem.find(':') == std::string::npos) {
 						throw std::runtime_error("bad minecraftItem");
@@ -240,6 +296,10 @@ namespace skycraft::ResourceBridge
 					const auto minecraftCount = entry.value("minecraftCount", 1);
 					if (skyrimCount <= 0 || skyrimCount > 4096 || minecraftCount <= 0 || minecraftCount > kMaxMinecraftPerRequest) {
 						throw std::runtime_error("counts must be 1..4096");
+					}
+					const bool ordinaryWeaponOnly = entry.value("ordinaryWeaponOnly", false);
+					if (ordinaryWeaponOnly && (boundObject->GetFormType() != RE::FormType::Weapon || skyrimCount != 1 || minecraftCount != 1)) {
+						throw std::runtime_error("ordinaryWeaponOnly requires a 1:1 Skyrim weapon mapping");
 					}
 					if (mappings.contains(formId)) {
 						throw std::runtime_error("duplicate skyrimFormId");
@@ -253,6 +313,7 @@ namespace skycraft::ResourceBridge
 					mapping.skyrimCount = skyrimCount;
 					mapping.minecraftCount = minecraftCount;
 					mapping.protectQuestItems = entry.value("protectQuestItems", true);
+					mapping.ordinaryWeaponOnly = ordinaryWeaponOnly;
 					mappings.emplace(formId, std::move(mapping));
 				} catch (const std::exception& e) {
 					++skipped;
@@ -344,9 +405,11 @@ namespace skycraft::ResourceBridge
 				a_targetCount,
 				a_mapping.skyrimCount,
 				a_mapping.minecraftCount,
-				a_mapping.protectQuestItems
+				a_mapping.protectQuestItems,
+				a_mapping.ordinaryWeaponOnly
 			});
-			BridgeInfo("progression bridge: requested {} x{} -> {} x{} (request {})",
+			BridgeInfo("{}: requested {} x{} -> {} x{} (request {})",
+				a_mapping.ordinaryWeaponOnly ? "weapon bridge" : "progression bridge",
 				a_mapping.name, a_sourceCount, a_mapping.minecraftItem, a_targetCount, requestId);
 			return true;
 		}
@@ -381,6 +444,23 @@ namespace skycraft::ResourceBridge
 				auto* mappedItem = RE::TESForm::LookupByID<RE::TESBoundObject>(mapping.formId);
 				if (mapping.protectQuestItems && IsQuestProtected(player, mappedItem)) {
 					BridgeInfo("progression bridge: kept quest-protected {} in Skyrim", mapping.name);
+					return RE::BSEventNotifyControl::kContinue;
+				}
+
+				if (mapping.ordinaryWeaponOnly) {
+					const auto safeTotal = OrdinaryWeaponCount(player, mappedItem);
+					const auto reserved = ReservedSourceCount(mapping.formId);
+					const auto available = std::max<std::int64_t>(0, static_cast<std::int64_t>(safeTotal) - reserved);
+					const auto eligible = static_cast<std::int32_t>(std::min<std::int64_t>(a_event->itemCount, available));
+					if (eligible <= 0) {
+						BridgeInfo("weapon bridge: kept {} in Skyrim because the matching inventory entry is special or already reserved", mapping.name);
+						return RE::BSEventNotifyControl::kContinue;
+					}
+					if (eligible != a_event->itemCount) {
+						BridgeInfo("weapon bridge: {} of {} newly acquired {} eligible; special/reserved copies stay in Skyrim",
+							eligible, a_event->itemCount, mapping.name);
+					}
+					Queue(mapping, eligible, eligible);
 					return RE::BSEventNotifyControl::kContinue;
 				}
 
@@ -430,7 +510,7 @@ namespace skycraft::ResourceBridge
 	void Install()
 	{
 		SetupProgressionLog();
-		BridgeInfo("SkyCraft progression 0.1.2-progression.5 starting");
+		BridgeInfo("SkyCraft progression 0.1.2-progression.6 starting");
 
 		settings = LoadSettings();
 		if (!settings.enabled) {
@@ -479,7 +559,9 @@ namespace skycraft::ResourceBridge
 		pending.erase(it);
 
 		if (a_event.weapon != transfer.itemHash) {
-			RestoreCarry(transfer, transfer.sourceCount);
+			if (!transfer.ordinaryWeaponOnly) {
+				RestoreCarry(transfer, transfer.sourceCount);
+			}
 			BridgeWarn("progression bridge: acknowledgement {} had the wrong item hash; Skyrim item kept", requestId);
 			return true;
 		}
@@ -488,7 +570,9 @@ namespace skycraft::ResourceBridge
 		const auto completeGroups = accepted / transfer.minecraftPerGroup;
 		const auto removeCount = std::min(transfer.sourceCount, completeGroups * transfer.skyrimPerGroup);
 		if (removeCount <= 0) {
-			RestoreCarry(transfer, transfer.sourceCount);
+			if (!transfer.ordinaryWeaponOnly) {
+				RestoreCarry(transfer, transfer.sourceCount);
+			}
 			BridgeWarn("progression bridge: Minecraft declined request {}; Skyrim item kept", requestId);
 			return true;
 		}
@@ -496,18 +580,22 @@ namespace skycraft::ResourceBridge
 		auto* player = RE::PlayerCharacter::GetSingleton();
 		auto* item = RE::TESForm::LookupByID<RE::TESBoundObject>(transfer.formId);
 		if (!player || !item) {
-			RestoreCarry(transfer, transfer.sourceCount);
+			if (!transfer.ordinaryWeaponOnly) {
+				RestoreCarry(transfer, transfer.sourceCount);
+			}
 			BridgeWarn("progression bridge: couldn't remove acknowledged Skyrim item for request {}", requestId);
 			return true;
 		}
 
 		if (transfer.protectQuestItems && IsQuestProtected(player, item)) {
-			RestoreCarry(transfer, transfer.sourceCount);
+			if (!transfer.ordinaryWeaponOnly) {
+				RestoreCarry(transfer, transfer.sourceCount);
+			}
 			BridgeWarn("progression bridge: request {} became quest-protected before acknowledgement; Skyrim source kept", requestId);
 			return true;
 		}
 
-		const auto actual = std::max(0, player->GetItemCount(item));
+		const auto actual = transfer.ordinaryWeaponOnly ? OrdinaryWeaponCount(player, item) : std::max(0, player->GetItemCount(item));
 		const auto safeRemove = std::min(removeCount, actual);
 		if (safeRemove <= 0) {
 			BridgeWarn("progression bridge: request {} was granted by Minecraft but the Skyrim source item is no longer present", requestId);
@@ -521,14 +609,15 @@ namespace skycraft::ResourceBridge
 		player->RemoveItem(item, safeRemove, RE::ITEM_REMOVE_REASON::kRemove, nullptr, nullptr);
 
 		const auto unconsumedSource = transfer.sourceCount - safeRemove;
-		if (unconsumedSource > 0) {
+		if (unconsumedSource > 0 && !transfer.ordinaryWeaponOnly) {
 			RestoreCarry(transfer, unconsumedSource);
 		}
 		if (accepted % transfer.minecraftPerGroup != 0) {
 			BridgeWarn("progression bridge: request {} accepted a partial ratio; only complete groups were removed", requestId);
 		}
 
-		BridgeInfo("progression bridge: converted {} x{} into Minecraft x{} (request {})",
+		BridgeInfo("{}: converted {} x{} into Minecraft x{} (request {})",
+			transfer.ordinaryWeaponOnly ? "weapon bridge" : "progression bridge",
 			transfer.name, safeRemove, accepted, requestId);
 		return true;
 	}

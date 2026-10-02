@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "notes": "SkyCraft progression.5 mappings. Ratio leftovers carry across separate pickups in the current run. Quest-bound inventory entries are kept in Skyrim by default. Mappings may use skyrimFormId or plugin-aware skyrimPlugin + skyrimLocalFormId.",
+  "version": 4,
+  "notes": "SkyCraft progression.6: validated progression mappings plus user-tested ordinary Skyrim weapon conversion. Ratio carry-over, quest protection, plugin-aware FormIDs, ACK-before-remove, and conservative special-weapon protection remain enabled.",
   "mappings": [
     {
       "name": "Iron Ingot",
@@ -461,6 +461,46 @@
       "minecraftCount": 1,
       "enabled": true,
       "protectQuestItems": true
+    },
+    {
+      "name": "Iron Dagger",
+      "skyrimFormId": "0001397E",
+      "minecraftItem": "skycraft:skyrim_iron_dagger",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Iron Sword",
+      "skyrimFormId": "00012EB7",
+      "minecraftItem": "skycraft:skyrim_iron_sword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Iron Greatsword",
+      "skyrimFormId": "0001359D",
+      "minecraftItem": "skycraft:skyrim_iron_greatsword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Iron Battleaxe",
+      "skyrimFormId": "00013980",
+      "minecraftItem": "skycraft:skyrim_iron_battleaxe",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
     }
   ]
 }

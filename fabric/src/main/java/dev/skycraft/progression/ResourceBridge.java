@@ -64,7 +64,8 @@ public final class ResourceBridge {
 		int accepted = 0;
 		int remaining = count;
 		while (remaining > 0) {
-			int chunk = Math.min(remaining, 64);
+			// Respect registered stack size; custom equipment is unstackable.
+			int chunk = Math.min(remaining, Math.max(1, item.getDefaultMaxStackSize()));
 			ItemStack stack = new ItemStack(item, chunk);
 			player.getInventory().add(stack);
 			int overflow = stack.getCount();
