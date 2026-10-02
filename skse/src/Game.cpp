@@ -753,6 +753,46 @@ namespace skycraft
 			skateWasActive = skateAuthority;
 			st.skateOwnsPlayer = skateAuthority;
 
+			// The real Skate Session publishes a named skeletal pose separately from
+			// the small root/camera state. Validate that channel now, but do not
+			// retarget it onto Skyrim's skeleton until the rig mapping is ready.
+			if (skateAuthority) {
+				skateproto::PoseFrame poseFrame{};
+				if (skateBridge.ReadPoseFrame(poseFrame) &&
+					(poseFrame.flags & skateproto::kPoseValid) != 0 &&
+					poseFrame.boneCount > 0 &&
+					poseFrame.boneCount <= skateproto::kMaxPoseBones) {
+					bool finitePose = true;
+					for (std::uint32_t b = 0; b < poseFrame.boneCount && finitePose; ++b) {
+						if (poseFrame.bones[b].nameHash == 0) {
+							finitePose = false;
+							break;
+						}
+						for (float v : poseFrame.bones[b].matrix) {
+							if (!std::isfinite(v)) {
+								finitePose = false;
+								break;
+							}
+						}
+					}
+					static std::uint32_t loggedPoseSet = 0;
+					if (finitePose && poseFrame.nameSetId != loggedPoseSet) {
+						loggedPoseSet = poseFrame.nameSetId;
+						logger::info(
+							"Skate pose transport ready: {} bones, name set {:08X}, tick {}",
+							poseFrame.boneCount,
+							poseFrame.nameSetId,
+							poseFrame.tick);
+					} else if (!finitePose) {
+						static bool warnedBadPose = false;
+						if (!warnedBadPose) {
+							warnedBadPose = true;
+							logger::warn("Skate pose frame contained invalid bone data; ignoring animation frame");
+						}
+					}
+				}
+			}
+
 			const bool arriving = haveMc && st.mcInWorld && !loading && mc.teleportAck != teleportSeq && !takeover && !skateAuthority && !skateReleaseThisFrame;
 			if (arriving) {
 				const auto   here = SkyToMc(current);
