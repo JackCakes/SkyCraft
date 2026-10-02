@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Link.h"
+#include "skycraft_skate_protocol.h"
 
 namespace skycraft
 {
@@ -104,6 +105,11 @@ namespace skycraft
 		void ConsumeLook(float& a_dx, float& a_dy);
 		// Tells MC to release everything (input focus moved to Skyrim).
 		void ReleaseAll();
+		// Snapshot the keyboard fallback in the XInput-shaped Skate protocol.
+		// WASD = left stick, arrows = right stick, Q/E = analog triggers,
+		// Space/Ctrl/Shift/R = A/B/X/Y. This is diagnostic plumbing; the raw
+		// protocol also supports a real controller later without changing ABI.
+		void SampleSkateInput(skateproto::InputState& a_out, float a_frameSeconds);
 	}
 
 	namespace Input
