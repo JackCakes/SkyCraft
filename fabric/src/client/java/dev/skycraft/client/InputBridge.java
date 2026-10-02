@@ -113,9 +113,14 @@ public final class InputBridge {
 
 	/** Skyrim acquired a mapped item. Grant it on the authoritative Minecraft server. */
 	private static void transferResource(Minecraft minecraft, int requestId, int count, int itemHash) {
-		int sourceFormId = pendingResourceSourceRequestId == requestId ? pendingResourceSourceFormId : 0;
+		boolean matchedSource = pendingResourceSourceRequestId == requestId;
+		int sourceFormId = matchedSource ? pendingResourceSourceFormId : 0;
+		int sourceBaseFormId = matchedSource ? pendingResourceSourceBaseFormId : 0;
+		int sourceLevel = matchedSource ? pendingResourceSourceLevel : 0;
 		pendingResourceSourceRequestId = 0;
 		pendingResourceSourceFormId = 0;
+		pendingResourceSourceBaseFormId = 0;
+		pendingResourceSourceLevel = 0;
 		if (minecraft.player == null || count <= 0) {
 			resourceAck(requestId, itemHash, 0);
 			return;
