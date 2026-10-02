@@ -185,6 +185,26 @@ namespace skycraft
 			return m;
 		}
 
+		float SkateRootToMcYaw(const float a_quat[4])
+		{
+			float x = a_quat[0], y = a_quat[1], z = a_quat[2], w = a_quat[3];
+			const float len = std::sqrt(x * x + y * y + z * z + w * w);
+			if (!std::isfinite(len) || len < 1.0e-6f) {
+				return 0.0f;
+			}
+			x /= len, y /= len, z /= len, w /= len;
+			// Session/MC space is Y-up. Positive right-handed Y rotation turns
+			// +Z toward +X, while Minecraft yaw increases from +Z toward -X.
+			const float sinHeading = 2.0f * (w * y + x * z);
+			const float cosHeading = 1.0f - 2.0f * (y * y + z * z);
+			const float sessionHeading = std::atan2(sinHeading, cosHeading);
+			float mcYaw = -sessionHeading * kRadToDeg;
+			if (mcYaw < 0.0f) {
+				mcYaw += 360.0f;
+			}
+			return mcYaw;
+		}
+
 		RE::NiMatrix3 CameraBasisFromMc(const float a_forward[3], const float a_up[3])
 		{
 			auto normalize = [](RE::NiPoint3 a_v) {
@@ -971,6 +991,9 @@ namespace skycraft
 				lastSetPos = pos;
 				haveLastSet = true;
 				current = pos;
+				const float skateYaw = SkateRootToMcYaw(skateState.quat);
+				st.yaw = skateYaw;
+				a_player->data.angle.z = McYawToHeading(skateYaw);
 				st.feetX = skateState.x;
 				st.feetY = skateState.y;
 				st.feetZ = skateState.z;
