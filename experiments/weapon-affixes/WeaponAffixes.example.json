@@ -1,70 +1,87 @@
 {
-  "rollChance": 0.70,
+  "rollChance": 0.7,
   "affixes": [
     {
       "id": "brutal",
       "displayName": "Brutal",
       "weight": 25,
       "damageMultiplier": 1.25,
-      "attackSpeedMultiplier": 1.0,
-      "reachAdd": 0.0,
-      "durabilityMultiplier": 1.0,
-      "procChance": 0.0,
-      "procDamageMultiplier": 1.0,
-      "allowedWeapons": ["*"],
-      "enabled": true
+      "attackSpeedMultiplier": 1,
+      "reachAdd": 0,
+      "durabilityMultiplier": 1,
+      "procChance": 0,
+      "procDamageMultiplier": 1,
+      "allowedWeapons": [
+        "*"
+      ],
+      "enabled": true,
+      "knockbackAdd": 0
     },
     {
       "id": "swift",
       "displayName": "Swift",
       "weight": 25,
-      "damageMultiplier": 1.0,
-      "attackSpeedMultiplier": 1.30,
-      "reachAdd": 0.0,
-      "durabilityMultiplier": 1.0,
-      "procChance": 0.0,
-      "procDamageMultiplier": 1.0,
-      "allowedWeapons": ["skyrim_iron_dagger", "skyrim_iron_sword"],
-      "enabled": true
+      "damageMultiplier": 1,
+      "attackSpeedMultiplier": 1.3,
+      "reachAdd": 0,
+      "durabilityMultiplier": 1,
+      "procChance": 0,
+      "procDamageMultiplier": 1,
+      "allowedWeapons": [
+        "skyrim_iron_dagger",
+        "skyrim_iron_sword"
+      ],
+      "enabled": true,
+      "knockbackAdd": 0
     },
     {
       "id": "long",
       "displayName": "Long",
       "weight": 15,
-      "damageMultiplier": 1.0,
-      "attackSpeedMultiplier": 1.0,
-      "reachAdd": 0.50,
-      "durabilityMultiplier": 1.0,
-      "procChance": 0.0,
-      "procDamageMultiplier": 1.0,
-      "allowedWeapons": ["skyrim_iron_sword", "skyrim_iron_greatsword"],
-      "enabled": true
+      "damageMultiplier": 1,
+      "attackSpeedMultiplier": 1,
+      "reachAdd": 0.5,
+      "durabilityMultiplier": 1,
+      "procChance": 0,
+      "procDamageMultiplier": 1,
+      "allowedWeapons": [
+        "skyrim_iron_sword",
+        "skyrim_iron_greatsword"
+      ],
+      "enabled": true,
+      "knockbackAdd": 0
     },
     {
       "id": "sturdy",
       "displayName": "Sturdy",
       "weight": 15,
-      "damageMultiplier": 1.0,
-      "attackSpeedMultiplier": 1.0,
-      "reachAdd": 0.0,
-      "durabilityMultiplier": 1.50,
-      "procChance": 0.0,
-      "procDamageMultiplier": 1.0,
-      "allowedWeapons": ["*"],
-      "enabled": true
+      "damageMultiplier": 1,
+      "attackSpeedMultiplier": 1,
+      "reachAdd": 0,
+      "durabilityMultiplier": 1.5,
+      "procChance": 0,
+      "procDamageMultiplier": 1,
+      "allowedWeapons": [
+        "*"
+      ],
+      "enabled": true,
+      "knockbackAdd": 0
     },
     {
       "id": "volatile",
       "displayName": "Volatile",
       "weight": 20,
-      "damageMultiplier": 1.0,
-      "attackSpeedMultiplier": 1.0,
-      "reachAdd": 0.0,
-      "durabilityMultiplier": 1.0,
-      "procChance": 0.10,
-      "procDamageMultiplier": 3.0,
-      "allowedWeapons": ["*"],
-      "enabled": true
+      "damageMultiplier": 1,
+      "attackSpeedMultiplier": 1,
+      "reachAdd": 0,
+      "durabilityMultiplier": 1,
+      "procChance": 0.1,
+      "procDamageMultiplier": 3,
+      "allowedWeapons": [
+        "*"
+      ],
+      "enabled": true,
+      "knockbackAdd": 0
     },
     {
       "id": "deadly",
@@ -72,50 +89,83 @@
       "weight": 12,
       "damageMultiplier": 1.15,
       "attackSpeedMultiplier": 1.15,
-      "reachAdd": 0.0,
-      "durabilityMultiplier": 1.0,
-      "procChance": 0.0,
-      "procDamageMultiplier": 1.0,
-      "allowedWeapons": ["*"],
-      "enabled": true
+      "reachAdd": 0,
+      "durabilityMultiplier": 1,
+      "procChance": 0,
+      "procDamageMultiplier": 1,
+      "allowedWeapons": [
+        "*"
+      ],
+      "enabled": true,
+      "knockbackAdd": 0
     },
     {
       "id": "flurried",
       "displayName": "Flurried",
       "weight": 10,
-      "damageMultiplier": 0.90,
-      "attackSpeedMultiplier": 1.50,
-      "reachAdd": 0.0,
-      "durabilityMultiplier": 1.0,
-      "procChance": 0.0,
-      "procDamageMultiplier": 1.0,
-      "allowedWeapons": ["skyrim_iron_dagger", "skyrim_iron_sword"],
-      "enabled": true
+      "damageMultiplier": 0.9,
+      "attackSpeedMultiplier": 1.5,
+      "reachAdd": 0,
+      "durabilityMultiplier": 1,
+      "procChance": 0,
+      "procDamageMultiplier": 1,
+      "allowedWeapons": [
+        "skyrim_iron_dagger",
+        "skyrim_iron_sword"
+      ],
+      "enabled": true,
+      "knockbackAdd": 0
     },
     {
       "id": "berserker",
       "displayName": "Berserker",
       "weight": 10,
-      "damageMultiplier": 1.40,
-      "attackSpeedMultiplier": 0.80,
-      "reachAdd": 0.0,
-      "durabilityMultiplier": 1.10,
-      "procChance": 0.0,
-      "procDamageMultiplier": 1.0,
-      "allowedWeapons": ["skyrim_iron_greatsword", "skyrim_iron_battleaxe"],
-      "enabled": true
+      "damageMultiplier": 1.4,
+      "attackSpeedMultiplier": 0.8,
+      "reachAdd": 0,
+      "durabilityMultiplier": 1.1,
+      "procChance": 0,
+      "procDamageMultiplier": 1,
+      "allowedWeapons": [
+        "skyrim_iron_greatsword",
+        "skyrim_iron_battleaxe"
+      ],
+      "enabled": true,
+      "knockbackAdd": 0
     },
     {
       "id": "giant",
       "displayName": "Giant",
       "weight": 8,
-      "damageMultiplier": 1.20,
-      "attackSpeedMultiplier": 0.90,
+      "damageMultiplier": 1.2,
+      "attackSpeedMultiplier": 0.9,
       "reachAdd": 0.75,
-      "durabilityMultiplier": 1.0,
-      "procChance": 0.0,
-      "procDamageMultiplier": 1.0,
-      "allowedWeapons": ["skyrim_iron_greatsword", "skyrim_iron_battleaxe"],
+      "durabilityMultiplier": 1,
+      "procChance": 0,
+      "procDamageMultiplier": 1,
+      "allowedWeapons": [
+        "skyrim_iron_greatsword",
+        "skyrim_iron_battleaxe"
+      ],
+      "enabled": true,
+      "knockbackAdd": 0
+    },
+    {
+      "id": "forceful",
+      "displayName": "Forceful",
+      "weight": 10,
+      "damageMultiplier": 1.05,
+      "attackSpeedMultiplier": 1,
+      "reachAdd": 0,
+      "durabilityMultiplier": 1,
+      "knockbackAdd": 0.85,
+      "procChance": 0,
+      "procDamageMultiplier": 1,
+      "allowedWeapons": [
+        "skyrim_iron_sword",
+        "skyrim_iron_greatsword",
+        "skyrim_iron_battleaxe"
+      ],
       "enabled": true
     }
   ]

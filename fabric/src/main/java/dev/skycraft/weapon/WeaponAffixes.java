@@ -110,6 +110,7 @@ public final class WeaponAffixes {
                         + " | speed x" + trim(affix.attackSpeedMultiplier)
                         + " | reach " + String.format("%+.2f", affix.reachAdd)
                         + " | durability x" + trim(affix.durabilityMultiplier)
+                        + " | knockback " + String.format("%+.2f", affix.knockbackAdd)
                         + " | proc " + Math.round(affix.procChance * 100.0) + "% x" + trim(affix.procDamageMultiplier)
                         + (affix.sourceFormId != 0 ? String.format(" | Skyrim source %08X", affix.sourceFormId) : "")
                     ));
@@ -275,6 +276,7 @@ public final class WeaponAffixes {
             stored.getDoubleOr("attackSpeedMultiplier", 1.0),
             stored.getDoubleOr("reachAdd", 0.0),
             stored.getDoubleOr("durabilityMultiplier", 1.0),
+            stored.getDoubleOr("knockbackAdd", 0.0),
             stored.getDoubleOr("procChance", 0.0),
             stored.getDoubleOr("procDamageMultiplier", 1.0),
             stored.getIntOr("sourceFormId", 0)
@@ -306,6 +308,12 @@ public final class WeaponAffixes {
                     def.reachAdd, AttributeModifier.Operation.ADD_VALUE),
                 EquipmentSlotGroup.MAINHAND);
         }
+        if (Math.abs(def.knockbackAdd) > 1.0E-6) {
+            attrs.add(Attributes.ATTACK_KNOCKBACK,
+                new AttributeModifier(Identifier.fromNamespaceAndPath(SkyCraft.MOD_ID, "affix/" + safeId + "/knockback"),
+                    def.knockbackAdd, AttributeModifier.Operation.ADD_VALUE),
+                EquipmentSlotGroup.MAINHAND);
+        }
         stack.set(DataComponents.ATTRIBUTE_MODIFIERS, attrs.build());
 
         int maxDamage = stack.getOrDefault(DataComponents.MAX_DAMAGE, 0);
@@ -324,6 +332,7 @@ public final class WeaponAffixes {
         stored.putDouble("attackSpeedMultiplier", def.attackSpeedMultiplier);
         stored.putDouble("reachAdd", def.reachAdd);
         stored.putDouble("durabilityMultiplier", def.durabilityMultiplier);
+        stored.putDouble("knockbackAdd", def.knockbackAdd);
         stored.putDouble("procChance", def.procChance);
         stored.putDouble("procDamageMultiplier", def.procDamageMultiplier);
         stored.putInt("sourceFormId", sourceFormId);
@@ -343,6 +352,8 @@ public final class WeaponAffixes {
             lore.add(Component.literal(String.format("%+.2f reach", def.reachAdd)).withStyle(ChatFormatting.GRAY));
         if (Math.abs(def.durabilityMultiplier - 1.0) > 1.0E-6)
             lore.add(Component.literal(percent(def.durabilityMultiplier - 1.0) + " durability").withStyle(ChatFormatting.GRAY));
+        if (Math.abs(def.knockbackAdd) > 1.0E-6)
+            lore.add(Component.literal(String.format("%+.2f attack knockback", def.knockbackAdd)).withStyle(ChatFormatting.GRAY));
         if (def.procChance > 0.0 && def.procDamageMultiplier > 1.0)
             lore.add(Component.literal(Math.round(def.procChance * 100.0) + "% chance for x" + trim(def.procDamageMultiplier) + " damage")
                 .withStyle(ChatFormatting.LIGHT_PURPLE));
@@ -402,6 +413,7 @@ public final class WeaponAffixes {
         d.attackSpeedMultiplier = clamp(d.attackSpeedMultiplier, 0.05, 10.0);
         d.reachAdd = clamp(d.reachAdd, -2.0, 5.0);
         d.durabilityMultiplier = clamp(d.durabilityMultiplier, 0.05, 10.0);
+        d.knockbackAdd = clamp(d.knockbackAdd, -1.0, 5.0);
         d.procChance = clamp(d.procChance, 0.0, 1.0);
         d.procDamageMultiplier = clamp(d.procDamageMultiplier, 1.0, 20.0);
         if (d.allowedWeapons == null || d.allowedWeapons.isEmpty()) {
@@ -437,7 +449,8 @@ public final class WeaponAffixes {
             new AffixDefinition("deadly", "Deadly", 12, 1.15, 1.15, 0.0, 1.0, 0.0, 1.0, List.of("*"), true),
             new AffixDefinition("flurried", "Flurried", 10, 0.90, 1.50, 0.0, 1.0, 0.0, 1.0, List.of("skyrim_iron_dagger", "skyrim_iron_sword"), true),
             new AffixDefinition("berserker", "Berserker", 10, 1.40, 0.80, 0.0, 1.10, 0.0, 1.0, List.of("skyrim_iron_greatsword", "skyrim_iron_battleaxe"), true),
-            new AffixDefinition("giant", "Giant", 8, 1.20, 0.90, 0.75, 1.0, 0.0, 1.0, List.of("skyrim_iron_greatsword", "skyrim_iron_battleaxe"), true)
+            new AffixDefinition("giant", "Giant", 8, 1.20, 0.90, 0.75, 1.0, 0.0, 1.0, List.of("skyrim_iron_greatsword", "skyrim_iron_battleaxe"), true),
+            new AffixDefinition("forceful", "Forceful", 10, 1.05, 1.0, 0.0, 1.0, 0.85, 0.0, 1.0, List.of("skyrim_iron_sword", "skyrim_iron_greatsword", "skyrim_iron_battleaxe"), true)
         ));
         return c;
     }
@@ -448,6 +461,7 @@ public final class WeaponAffixes {
         double attackSpeedMultiplier,
         double reachAdd,
         double durabilityMultiplier,
+        double knockbackAdd,
         double procChance,
         double procDamageMultiplier,
         int sourceFormId
@@ -466,6 +480,7 @@ public final class WeaponAffixes {
         public double attackSpeedMultiplier = 1.0;
         public double reachAdd = 0.0;
         public double durabilityMultiplier = 1.0;
+        public double knockbackAdd = 0.0;
         public double procChance = 0.0;
         public double procDamageMultiplier = 1.0;
         public List<String> allowedWeapons = new ArrayList<>(List.of("*"));
@@ -477,6 +492,14 @@ public final class WeaponAffixes {
                                double attackSpeedMultiplier, double reachAdd, double durabilityMultiplier,
                                double procChance, double procDamageMultiplier, List<String> allowedWeapons,
                                boolean enabled) {
+            this(id, displayName, weight, damageMultiplier, attackSpeedMultiplier, reachAdd, durabilityMultiplier,
+                0.0, procChance, procDamageMultiplier, allowedWeapons, enabled);
+        }
+
+        public AffixDefinition(String id, String displayName, double weight, double damageMultiplier,
+                               double attackSpeedMultiplier, double reachAdd, double durabilityMultiplier,
+                               double knockbackAdd, double procChance, double procDamageMultiplier,
+                               List<String> allowedWeapons, boolean enabled) {
             this.id = id;
             this.displayName = displayName;
             this.weight = weight;
@@ -484,6 +507,7 @@ public final class WeaponAffixes {
             this.attackSpeedMultiplier = attackSpeedMultiplier;
             this.reachAdd = reachAdd;
             this.durabilityMultiplier = durabilityMultiplier;
+            this.knockbackAdd = knockbackAdd;
             this.procChance = procChance;
             this.procDamageMultiplier = procDamageMultiplier;
             this.allowedWeapons = new ArrayList<>(allowedWeapons);

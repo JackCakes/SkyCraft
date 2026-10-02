@@ -27,6 +27,7 @@ normal Minecraft saves/inventory moves and syncs to multiplayer clients.
 | Flurried | -10% damage, +50% speed; dagger/sword only |
 | Berserker | +40% damage, -20% speed, +10% durability; greatsword/battleaxe only |
 | Giant | +20% damage, -10% speed, +0.75 reach; greatsword/battleaxe only |
+| Forceful | +5% damage, +0.85 attack knockback; sword/greatsword/battleaxe |
 
 Static effects are per-stack Minecraft attribute/data-component overrides. Volatile is evaluated when
 damage reaches SkyCraft's Skyrim actor stand-in, after Minecraft has already applied normal weapon
@@ -97,3 +98,11 @@ roll produces no affix, so later source-aware loot rules do not lose where the i
 This does not change affix odds yet. It is groundwork for later rules such as boss/chief loot having
 better affix pools or a weapon remembering which Skyrim actor/container it came from. Console-created
 or world-source weapons may legitimately have source 00000000.
+
+
+## Knockback modifiers
+
+Affixes can now set `knockbackAdd`. This is applied through Minecraft's normal
+`ATTACK_KNOCKBACK` attribute, so SkyCraft's existing proxy-entity combat path captures the stronger
+Minecraft shove and forwards that knockback strength/direction into Skyrim along with the hit. It does
+not need a second custom Skyrim damage implementation.
