@@ -121,10 +121,12 @@ public final class WeaponAffixes {
 
     /** Roll at most one affix onto a fresh weapon. Existing affixed stacks are never rerolled. */
     public static Optional<String> roll(ItemStack stack, RandomSource random) {
-        if (!isEligible(stack) || readId(stack).isPresent() || BY_ID.isEmpty()) {
+        if (!isEligible(stack) || hasRollMarker(stack) || BY_ID.isEmpty()) {
             return Optional.empty();
         }
         if (random.nextDouble() >= config.rollChance) {
+            markNoAffix(stack);
+            SkyCraft.LOG.info("SkyCraft affix: rolled no affix on {}", BuiltInRegistries.ITEM.getKey(stack.getItem()));
             return Optional.empty();
         }
 
@@ -161,6 +163,25 @@ public final class WeaponAffixes {
         return readStored(stack).map(StoredAffix::id);
     }
 
+    private static boolean hasRollMarker(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return false;
+        CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
+        if (custom == null) return false;
+        CompoundTag stored = custom.copyTag().getCompoundOrEmpty(ROOT);
+        return !stored.isEmpty() && stored.getIntOr("v", 0) == FORMAT;
+    }
+
+    private static void markNoAffix(ItemStack stack) {
+        CompoundTag root = stack.has(DataComponents.CUSTOM_DATA)
+            ? stack.get(DataComponents.CUSTOM_DATA).copyTag()
+            : new CompoundTag();
+        CompoundTag stored = new CompoundTag();
+        stored.putInt("v", FORMAT);
+        stored.putString("id", "none");
+        root.put(ROOT, stored);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(root));
+    }
+
     private static Optional<StoredAffix> readStored(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return Optional.empty();
         CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
@@ -168,7 +189,7 @@ public final class WeaponAffixes {
         CompoundTag stored = custom.copyTag().getCompoundOrEmpty(ROOT);
         if (stored.isEmpty() || stored.getIntOr("v", 0) != FORMAT) return Optional.empty();
         Optional<String> id = stored.getString("id");
-        if (id.isEmpty()) return Optional.empty();
+        if (id.isEmpty() || "none".equals(id.get())) return Optional.empty();
         return Optional.of(new StoredAffix(
             id.get(),
             stored.getDoubleOr("damageMultiplier", 1.0),
