@@ -4,6 +4,10 @@ on:
   push:
     branches: ["feature/skate-bridge"]
 
+concurrency:
+  group: skse-prototype-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   skse:
     runs-on: windows-2025-vs2026
