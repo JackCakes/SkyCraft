@@ -1,5 +1,6 @@
 #include "Dig.h"
 #include "Game.h"
+#include "ResourceBridge.h"
 
 namespace
 {
@@ -32,11 +33,13 @@ namespace
 			skycraft::WorldRender::Install();
 			skycraft::PathAvoid::Install();
 			skycraft::Dig::Install();
+			skycraft::ResourceBridge::Install();
 			skycraft::CrashLog::Install();
 			break;
 		case SKSE::MessagingInterface::kPostLoadGame:
 		case SKSE::MessagingInterface::kNewGame:
 			skycraft::Game::OnGameLoaded();
+			skycraft::ResourceBridge::OnGameLoaded();
 			break;
 		default:
 			break;
@@ -49,7 +52,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 	SKSE::Init(a_skse, { .trampoline = true, .trampolineSize = 1024 });
 	SetupLog();
 	skycraft::CrashLog::Install();
-	logger::info("SkyCraft {} loading (runtime {})", "0.1.2", a_skse->RuntimeVersion().string());
+	logger::info("SkyCraft {} loading (runtime {})", "0.1.2-progression.1", a_skse->RuntimeVersion().string());
 	SKSE::GetMessagingInterface()->RegisterListener(OnMessage);
 	// As early as possible: Minecraft takes about as long to start as Skyrim does to reach its menu.
 	skycraft::Launcher::StartMinecraft();
