@@ -74,3 +74,11 @@ weapon, enough hits should eventually make the log show:
 - Affixes are server authoritative because the Minecraft server creates the ItemStack and rolls procs.
 - If the weapon bridge is not yet user-validated, this branch can still validate the Minecraft-side
   affix mechanics independently with the test command.
+
+
+## Balancing helper
+
+Hold any SkyCraft weapon and run `/skyaffixes chances`. It prints that weapon family's current
+effective probability for no affix and for every eligible prefix after applying both the global
+`rollChance` and the weighted per-weapon pool. This makes balancing the JSON table possible without
+doing hundreds of manual drops.

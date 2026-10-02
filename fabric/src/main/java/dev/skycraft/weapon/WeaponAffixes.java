@@ -109,6 +109,26 @@ public final class WeaponAffixes {
                     ));
                     return 1;
                 }))
+                .then(Commands.literal("chances").executes(context -> {
+                    ServerPlayer player = context.getSource().getPlayerOrException();
+                    ItemStack stack = player.getMainHandItem();
+                    if (!isEligible(stack)) {
+                        player.sendSystemMessage(Component.literal("Hold a SkyCraft weapon to view its affix chances."));
+                        return 0;
+                    }
+                    List<AffixDefinition> candidates = candidatesFor(stack);
+                    double total = candidates.stream().mapToDouble(def -> def.weight).sum();
+                    StringBuilder out = new StringBuilder("Affix chances: ");
+                    out.append(String.format("None %.1f%%", (1.0 - config.rollChance) * 100.0));
+                    if (total > 0.0) {
+                        for (AffixDefinition def : candidates) {
+                            double chance = config.rollChance * def.weight / total * 100.0;
+                            out.append(String.format(" | %s %.1f%%", def.displayName, chance));
+                        }
+                    }
+                    player.sendSystemMessage(Component.literal(out.toString()));
+                    return 1;
+                }))
                 .then(Commands.literal("reload").executes(context -> {
                     reload();
                     context.getSource().sendSuccess(() -> Component.literal("Reloaded SkyCraft weapon affixes for future rolls."), false);
@@ -136,9 +156,7 @@ public final class WeaponAffixes {
             return Optional.empty();
         }
 
-        List<AffixDefinition> candidates = BY_ID.values().stream()
-            .filter(def -> appliesTo(def, stack))
-            .toList();
+        List<AffixDefinition> candidates = candidatesFor(stack);
         if (candidates.isEmpty()) {
             markNoAffix(stack);
             return Optional.empty();
@@ -197,6 +215,12 @@ public final class WeaponAffixes {
         stored.putString("id", "none");
         root.put(ROOT, stored);
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(root));
+    }
+
+    private static List<AffixDefinition> candidatesFor(ItemStack stack) {
+        return BY_ID.values().stream()
+            .filter(def -> appliesTo(def, stack))
+            .toList();
     }
 
     private static boolean appliesTo(AffixDefinition def, ItemStack stack) {
