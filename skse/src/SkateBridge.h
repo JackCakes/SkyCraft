@@ -3,6 +3,8 @@
 #include "Link.h"
 #include "skycraft_skate_protocol.h"
 
+#include <thread>
+
 namespace skycraft
 {
 	class SkateBridge
@@ -41,5 +43,6 @@ namespace skycraft
 		HANDLE mapping_{ nullptr };
 		std::uint8_t* base_{ nullptr };
 		std::atomic<std::uint32_t> worldId_{ 0 };
+		std::jthread heartbeatThread_{};
 	};
 }
