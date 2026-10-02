@@ -2,5 +2,35 @@
   "parent": "minecraft:item/handheld",
   "textures": {
     "layer0": "skycraft:item/skyrim_elven_mace"
+  },
+  "display": {
+    "firstperson_righthand": {
+      "scale": [
+        0.88,
+        0.88,
+        0.88
+      ]
+    },
+    "firstperson_lefthand": {
+      "scale": [
+        0.88,
+        0.88,
+        0.88
+      ]
+    },
+    "thirdperson_righthand": {
+      "scale": [
+        0.88,
+        0.88,
+        0.88
+      ]
+    },
+    "thirdperson_lefthand": {
+      "scale": [
+        0.88,
+        0.88,
+        0.88
+      ]
+    }
   }
 }

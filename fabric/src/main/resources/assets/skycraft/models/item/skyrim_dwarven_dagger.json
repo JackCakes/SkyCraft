@@ -2,5 +2,35 @@
   "parent": "minecraft:item/handheld",
   "textures": {
     "layer0": "skycraft:item/skyrim_dwarven_dagger"
+  },
+  "display": {
+    "firstperson_righthand": {
+      "scale": [
+        0.72,
+        0.72,
+        0.72
+      ]
+    },
+    "firstperson_lefthand": {
+      "scale": [
+        0.72,
+        0.72,
+        0.72
+      ]
+    },
+    "thirdperson_righthand": {
+      "scale": [
+        0.72,
+        0.72,
+        0.72
+      ]
+    },
+    "thirdperson_lefthand": {
+      "scale": [
+        0.72,
+        0.72,
+        0.72
+      ]
+    }
   }
 }

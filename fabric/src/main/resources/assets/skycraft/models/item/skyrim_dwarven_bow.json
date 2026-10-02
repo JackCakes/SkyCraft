@@ -2,5 +2,35 @@
   "parent": "minecraft:item/handheld",
   "textures": {
     "layer0": "skycraft:item/skyrim_dwarven_bow"
+  },
+  "display": {
+    "firstperson_righthand": {
+      "scale": [
+        0.95,
+        0.95,
+        0.95
+      ]
+    },
+    "firstperson_lefthand": {
+      "scale": [
+        0.95,
+        0.95,
+        0.95
+      ]
+    },
+    "thirdperson_righthand": {
+      "scale": [
+        0.95,
+        0.95,
+        0.95
+      ]
+    },
+    "thirdperson_lefthand": {
+      "scale": [
+        0.95,
+        0.95,
+        0.95
+      ]
+    }
   }
 }
