@@ -91,3 +91,16 @@ plugin-aware pair, not both.
 
 No weapon/armor experiment is merged by this iteration. Those remain on their own branches until
 their end-to-end in-game tests pass.
+
+
+### Built-in v5 validation mapping
+
+The packaged Carrot mapping intentionally uses the plugin-aware form:
+
+`Skyrim.esm + 00064B40`
+
+instead of an absolute runtime FormID. This gives the normal v5 smoke test a real exercise of the
+new resolver without requiring any DLC or third-party mod. Adding a Skyrim Carrot should still
+produce a Minecraft Carrot exactly as it did in progression.4.
+
+The loader rejects ambiguous entries that specify both `skyrimFormId` and the plugin-aware pair.

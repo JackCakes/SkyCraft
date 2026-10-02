@@ -141,15 +141,19 @@ namespace skycraft::ResourceBridge
 
 		RE::TESBoundObject* ResolveMappedObject(const nlohmann::json& a_entry, RE::FormID& a_formId, std::string& a_source)
 		{
+			const bool hasAbsolute = a_entry.contains("skyrimFormId");
 			const bool hasPlugin = a_entry.contains("skyrimPlugin");
 			const bool hasLocal = a_entry.contains("skyrimLocalFormId");
+			if (hasAbsolute && (hasPlugin || hasLocal)) {
+				throw std::runtime_error("mapping must use either skyrimFormId or skyrimPlugin + skyrimLocalFormId, not both");
+			}
 			if (hasPlugin || hasLocal) {
 				if (!hasPlugin || !hasLocal || !a_entry["skyrimPlugin"].is_string()) {
 					throw std::runtime_error("plugin-aware mapping needs both skyrimPlugin and skyrimLocalFormId");
 				}
 				const auto plugin = a_entry["skyrimPlugin"].get<std::string>();
 				RE::FormID localId = 0;
-				if (plugin.empty() || !ParseFormId(a_entry["skyrimLocalFormId"], localId)) {
+				if (plugin.empty() || !ParseFormId(a_entry["skyrimLocalFormId"], localId) || localId == 0) {
 					throw std::runtime_error("bad plugin-aware form reference");
 				}
 				auto* data = RE::TESDataHandler::GetSingleton();
@@ -227,7 +231,7 @@ namespace skycraft::ResourceBridge
 					}
 					RE::FormID formId = 0;
 					std::string formSource;
-					auto* boundObject = ResolveMappedObject(entry, formId, formSource);
+					ResolveMappedObject(entry, formId, formSource);
 					const auto minecraftItem = entry.value("minecraftItem", std::string{});
 					if (minecraftItem.empty() || minecraftItem.find(':') == std::string::npos) {
 						throw std::runtime_error("bad minecraftItem");

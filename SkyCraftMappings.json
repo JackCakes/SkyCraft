@@ -94,12 +94,13 @@
     },
     {
       "name": "Carrot",
-      "skyrimFormId": "00064B40",
       "minecraftItem": "minecraft:carrot",
       "skyrimCount": 1,
       "minecraftCount": 1,
       "enabled": true,
-      "protectQuestItems": true
+      "protectQuestItems": true,
+      "skyrimPlugin": "Skyrim.esm",
+      "skyrimLocalFormId": "00064B40"
     },
     {
       "name": "Potato",
