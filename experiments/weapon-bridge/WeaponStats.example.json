@@ -1,8 +1,15 @@
 {
   "weapons": {
-    "skyrim_iron_dagger":     { "damage": 4.0,  "attackSpeed": 2.0, "reach": 1.8, "durability": 150 },
-    "skyrim_iron_sword":      { "damage": 6.0,  "attackSpeed": 1.6, "reach": 2.5, "durability": 200 },
-    "skyrim_iron_greatsword": { "damage": 11.0, "attackSpeed": 1.0, "reach": 3.0, "durability": 350 },
-    "skyrim_iron_battleaxe":  { "damage": 12.0, "attackSpeed": 0.9, "reach": 3.0, "durability": 400 }
+    "skyrim_iron_dagger":        { "damage": 4.0,  "attackSpeed": 2.0, "reach": 1.8, "durability": 150 },
+    "skyrim_iron_sword":         { "damage": 6.0,  "attackSpeed": 1.6, "reach": 2.5, "durability": 200 },
+    "skyrim_iron_greatsword":    { "damage": 11.0, "attackSpeed": 1.0, "reach": 3.0, "durability": 350 },
+    "skyrim_iron_battleaxe":     { "damage": 12.0, "attackSpeed": 0.9, "reach": 3.0, "durability": 400 },
+    "skyrim_dwarven_dagger":     { "damage": 6.0,  "attackSpeed": 2.0, "reach": 1.8, "durability": 300 },
+    "skyrim_dwarven_sword":      { "damage": 8.0,  "attackSpeed": 1.6, "reach": 2.5, "durability": 400 },
+    "skyrim_dwarven_war_axe":    { "damage": 9.0,  "attackSpeed": 1.4, "reach": 2.5, "durability": 450 },
+    "skyrim_dwarven_mace":       { "damage": 10.0, "attackSpeed": 1.2, "reach": 2.5, "durability": 500 },
+    "skyrim_dwarven_greatsword": { "damage": 13.0, "attackSpeed": 1.0, "reach": 3.0, "durability": 550 },
+    "skyrim_dwarven_battleaxe":  { "damage": 14.0, "attackSpeed": 0.9, "reach": 3.0, "durability": 600 },
+    "skyrim_dwarven_warhammer":  { "damage": 15.0, "attackSpeed": 0.8, "reach": 3.0, "durability": 650 }
   }
 }
