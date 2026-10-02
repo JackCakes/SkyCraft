@@ -137,7 +137,7 @@ public final class WeaponAffixes {
 
     private static void apply(ItemStack stack, AffixDefinition def) {
         ItemAttributeModifiers.Builder attrs = ItemAttributeModifiers.builder();
-        for (ItemAttributeModifiers.Entry entry : stack.getAttributeModifiers().modifiers()) {
+        for (ItemAttributeModifiers.Entry entry : stack.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY).modifiers()) {
             attrs.add(entry.attribute(), entry.modifier(), entry.slot());
         }
 
