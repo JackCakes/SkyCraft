@@ -1,5 +1,7 @@
 #include "SkateBridge.h"
 
+#include <sddl.h>
+
 namespace skycraft
 {
 	namespace
@@ -11,6 +13,35 @@ namespace skycraft
 		}
 
 		constexpr std::uint64_t kHostTimeoutMs = 3000;
+
+		// Match SkyCraft's main shared-memory ACL. In particular, a Skyrim started
+		// elevated must still be openable by the normal-integrity Rust host.
+		PSECURITY_DESCRIPTOR SharedWithThisUser()
+		{
+			std::wstring sddl = L"D:P(A;;GA;;;SY)(A;;GA;;;BA)";
+			HANDLE       token = nullptr;
+			if (::OpenProcessToken(::GetCurrentProcess(), TOKEN_QUERY, &token)) {
+				DWORD size = 0;
+				::GetTokenInformation(token, TokenUser, nullptr, 0, &size);
+				std::vector<std::uint8_t> buffer(size);
+				if (size && ::GetTokenInformation(token, TokenUser, buffer.data(), size, &size)) {
+					LPWSTR sid = nullptr;
+					if (::ConvertSidToStringSidW(reinterpret_cast<TOKEN_USER*>(buffer.data())->User.Sid, &sid)) {
+						sddl += std::wstring(L"(A;;GA;;;") + sid + L")";
+						::LocalFree(sid);
+					}
+				}
+				::CloseHandle(token);
+			}
+			sddl += L"S:(ML;;NW;;;ME)";
+			PSECURITY_DESCRIPTOR descriptor = nullptr;
+			if (!::ConvertStringSecurityDescriptorToSecurityDescriptorW(
+					sddl.c_str(), SDDL_REVISION_1, &descriptor, nullptr)) {
+				logger::warn("Skate bridge: couldn't build shared-memory ACL ({})", ::GetLastError());
+				return nullptr;
+			}
+			return descriptor;
+		}
 	}
 
 	SkateBridge& SkateBridge::Get()
@@ -26,15 +57,20 @@ namespace skycraft
 		}
 
 		const auto size = skateproto::kMappingBytes;
+		SECURITY_ATTRIBUTES access{ sizeof(access), SharedWithThisUser(), FALSE };
 		mapping_ = ::CreateFileMappingW(
 			INVALID_HANDLE_VALUE,
-			nullptr,
+			access.lpSecurityDescriptor ? &access : nullptr,
 			PAGE_READWRITE,
 			static_cast<DWORD>(size >> 32),
 			static_cast<DWORD>(size & 0xFFFFFFFF),
 			skateproto::kMappingName);
+		const DWORD created = ::GetLastError();
+		if (access.lpSecurityDescriptor) {
+			::LocalFree(access.lpSecurityDescriptor);
+		}
 		if (!mapping_) {
-			logger::warn("Skate bridge: CreateFileMapping failed ({})", ::GetLastError());
+			logger::warn("Skate bridge: CreateFileMapping failed ({})", created);
 			return false;
 		}
 
@@ -54,7 +90,7 @@ namespace skycraft
 		header->skyrimHeartbeatMs = ::GetTickCount64();
 		Atomic(header->magic).store(skateproto::kMagic, std::memory_order_release);
 
-		logger::info("Skate bridge shared memory created");
+		logger::info("Skate bridge shared memory {} ({} MB, {})", "Local\\SkyCraftSkate_v1", size >> 20, created == ERROR_ALREADY_EXISTS ? "reused" : "created");
 		return true;
 	}
 
