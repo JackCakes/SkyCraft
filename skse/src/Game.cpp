@@ -540,6 +540,29 @@ namespace skycraft
 				teleportPending = true;
 			}
 			mcWasAlive = mcAlive;
+
+			// The Skate host is optional and may be started after Skyrim. When a new host
+			// appears, bump the shared collision epoch so it receives a complete fresh set
+			// of exact Havok regions instead of only the regions that happen to refresh.
+			auto& skateBridge = SkateBridge::Get();
+			static bool          skateHostWasAlive = false;
+			static std::uint32_t lastSkateHostPid = 0;
+			const bool           skateHostAlive = skateBridge.HostAlive();
+			const auto           skateHostPid = skateBridge.HostPid();
+			const bool           newSkateHost = skateHostAlive && skateHostPid != 0 && skateHostPid != lastSkateHostPid;
+			if (skateHostAlive) {
+				lastSkateHostPid = skateHostPid;
+			}
+			if (skateHostAlive && (!skateHostWasAlive || newSkateHost)) {
+				logger::info("Skate host connected; resending collision");
+				++epoch;
+				Collision::Get().Reset(epoch);
+			}
+			if (!skateHostAlive && skateHostWasAlive) {
+				logger::info("Skate host disconnected; SkyCraft continues normally");
+			}
+			skateHostWasAlive = skateHostAlive;
+
 			st.mcInWorld = haveMc && (mc.flags & proto::kMcInWorld);
 			const bool screenOpen = haveMc && (mc.flags & proto::kMcScreenOpen);
 			if (screenOpen && !st.mcScreenOpen) {
@@ -996,15 +1019,14 @@ namespace skycraft
 
 			// Experimental Skate bridge: publish the same world/player frame to the Rust host.
 			// This does not take movement authority yet; it only validates transport safely.
-			auto& skate = SkateBridge::Get();
-			skate.SetWorld(worldId);
+			skateBridge.SetWorld(worldId);
 			static bool skateRequested = false;
 			if (!menu && !loading && (::GetAsyncKeyState(VK_F6) & 1)) {
 				skateRequested = !skateRequested;
 				logger::info(
 					"Skate mode requested {} (host {})",
 					skateRequested ? "on" : "off",
-					skate.HostAlive() ? "connected" : "not connected");
+					skateBridge.HostAlive() ? "connected" : "not connected");
 			}
 			skateproto::SkyState skateSky{};
 			skateSky.flags = (cell ? skateproto::kSkyInGame : 0u) |
@@ -1021,7 +1043,7 @@ namespace skycraft
 			skateSky.aspect = static_cast<float>(sky.viewportW) /
 			                  static_cast<float>(std::max<std::uint32_t>(sky.viewportH, 1));
 			skateSky.requestedMode = skateRequested ? skateproto::kModeSkate : skateproto::kModeMinecraft;
-			skate.WriteSkyState(skateSky);
+			skateBridge.WriteSkyState(skateSky);
 
 			settleTimer -= a_delta;
 			if (haveMc && !loading && cell && settleTimer <= 0.0f) {
