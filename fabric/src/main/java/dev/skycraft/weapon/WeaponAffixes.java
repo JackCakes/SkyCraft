@@ -365,7 +365,7 @@ public final class WeaponAffixes {
             for (String raw : d.allowedWeapons) {
                 if (raw == null) continue;
                 String weapon = raw.trim().toLowerCase(java.util.Locale.ROOT);
-                if ("*".equals(weapon) || CORE_WEAPONS.contains(weapon)) {
+                if ("*".equals(weapon) || weapon.matches("[a-z0-9_./-]+")) {
                     if (!allowed.contains(weapon)) allowed.add(weapon);
                 }
             }
