@@ -699,6 +699,7 @@ namespace skycraft
 				!loading && !menu && !a_player->IsDead() && !takeover;
 
 			static bool skateWasActive = false;
+			const bool skateReleaseThisFrame = skateWasActive && !skateAuthority;
 			if (!skateWasActive && skateAuthority) {
 				Input::ReleaseAll();
 				logger::info(
@@ -723,7 +724,7 @@ namespace skycraft
 			skateWasActive = skateAuthority;
 			st.skateOwnsPlayer = skateAuthority;
 
-			const bool arriving = haveMc && st.mcInWorld && !loading && mc.teleportAck != teleportSeq && !takeover && !skateAuthority;
+			const bool arriving = haveMc && st.mcInWorld && !loading && mc.teleportAck != teleportSeq && !takeover && !skateAuthority && !skateReleaseThisFrame;
 			if (arriving) {
 				const auto   here = SkyToMc(current);
 				const double gap = std::sqrt((here.x - mc.x) * (here.x - mc.x) + (here.y - mc.y) * (here.y - mc.y) + (here.z - mc.z) * (here.z - mc.z));
@@ -738,8 +739,11 @@ namespace skycraft
 			}
 
 			// A dead Skyrim player gets Skyrim's own death camera and reload.
-			const bool puppet = haveMc && st.mcInWorld && mc.teleportAck == teleportSeq && !loading && !a_player->IsDead() && !takeover && !skateAuthority;
-			st.minecraftOwnsPlayer = puppet || (arriving && !a_player->IsDead());
+			const bool puppet = haveMc && st.mcInWorld && mc.teleportAck == teleportSeq && !loading && !a_player->IsDead() && !takeover && !skateAuthority && !skateReleaseThisFrame;
+			// Keep Skyrim controls suppressed for the one hand-back frame as well.
+			// The next frame processes teleportPending and Minecraft acknowledges the
+			// host's final position through the normal SkyCraft teleport handshake.
+			st.minecraftOwnsPlayer = skateReleaseThisFrame || puppet || (arriving && !a_player->IsDead());
 			if (puppet != st.puppeting) {
 				logger::info("puppet {}", puppet ? "on (Minecraft drives the player)" : "off");
 			}
