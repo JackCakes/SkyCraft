@@ -188,6 +188,28 @@ namespace skycraft
 		return false;
 	}
 
+	bool SkateBridge::ReadPoseFrame(skateproto::PoseFrame& a_out) const
+	{
+		if (!base_) {
+			return false;
+		}
+		auto* src = At<skateproto::PoseFrame>(skateproto::kOffPoseFrame);
+		auto seq = Atomic(src->seq);
+		for (int attempt = 0; attempt < 16; ++attempt) {
+			const auto s1 = seq.load(std::memory_order_acquire);
+			if (s1 & 1) {
+				_mm_pause();
+				continue;
+			}
+			std::memcpy(&a_out, src, sizeof(a_out));
+			std::atomic_thread_fence(std::memory_order_acquire);
+			if (seq.load(std::memory_order_relaxed) == s1) {
+				return a_out.boneCount <= skateproto::kMaxPoseBones;
+			}
+		}
+		return false;
+	}
+
 	bool SkateBridge::WriteCollision(skateproto::ColType a_type, const void* a_payload, std::uint32_t a_bytes)
 	{
 		if (!base_) {
