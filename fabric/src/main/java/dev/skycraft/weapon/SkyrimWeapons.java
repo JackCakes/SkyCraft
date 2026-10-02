@@ -64,7 +64,13 @@ public final class SkyrimWeapons {
 
     private enum MaterialTier {
         IRON(0.0, 0),
-        DWARVEN(2.0, 150);
+        STEEL(1.0, 75),
+        DWARVEN(2.0, 150),
+        ORCISH(3.0, 225),
+        ELVEN(4.0, 300),
+        GLASS(5.0, 400),
+        EBONY(6.0, 525),
+        DAEDRIC(7.0, 675);
 
         final double damageBonus;
         final int durabilityBonus;
