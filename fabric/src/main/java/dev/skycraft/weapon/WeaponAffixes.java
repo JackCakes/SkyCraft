@@ -2,6 +2,7 @@ package dev.skycraft.weapon;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import dev.skycraft.SkyCraft;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -42,7 +43,7 @@ public final class WeaponAffixes {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path CONFIG = FabricLoader.getInstance().getConfigDir().resolve("skycraft-weapon-affixes.json");
     private static final String ROOT = "SkyCraftAffix";
-    private static final int FORMAT = 1;
+    private static final int FORMAT = 2;
 
     private static AffixConfig config = defaults();
     private static final Map<String, AffixDefinition> BY_ID = new LinkedHashMap<>();
@@ -66,6 +67,40 @@ public final class WeaponAffixes {
                         player.getInventory().add(stack);
                     }
                     player.sendSystemMessage(Component.literal("Added 12 independently rolled SkyCraft Iron Swords."));
+                    return 1;
+                }))
+                .then(Commands.literal("give")
+                    .then(Commands.argument("id", StringArgumentType.word()).executes(context -> {
+                        ServerPlayer player = context.getSource().getPlayerOrException();
+                        String id = StringArgumentType.getString(context, "id").toLowerCase(java.util.Locale.ROOT);
+                        AffixDefinition def = BY_ID.get(id);
+                        Item item = SkyrimWeapons.byId("skyrim_iron_sword");
+                        if (def == null || item == null) {
+                            player.sendSystemMessage(Component.literal("Unknown affix '" + id + "'. Available: " + String.join(", ", BY_ID.keySet())));
+                            return 0;
+                        }
+                        ItemStack stack = new ItemStack(item);
+                        apply(stack, def);
+                        player.getInventory().add(stack);
+                        player.sendSystemMessage(Component.literal("Added deterministic test weapon with affix: " + def.displayName));
+                        return 1;
+                    })))
+                .then(Commands.literal("inspect").executes(context -> {
+                    ServerPlayer player = context.getSource().getPlayerOrException();
+                    ItemStack stack = player.getMainHandItem();
+                    StoredAffix affix = readStored(stack).orElse(null);
+                    if (affix == null) {
+                        player.sendSystemMessage(Component.literal("Held item has no SkyCraft affix."));
+                        return 0;
+                    }
+                    player.sendSystemMessage(Component.literal(
+                        "Affix " + affix.id
+                        + " | damage x" + trim(affix.damageMultiplier)
+                        + " | speed x" + trim(affix.attackSpeedMultiplier)
+                        + " | reach " + String.format("%+.2f", affix.reachAdd)
+                        + " | durability x" + trim(affix.durabilityMultiplier)
+                        + " | proc " + Math.round(affix.procChance * 100.0) + "% x" + trim(affix.procDamageMultiplier)
+                    ));
                     return 1;
                 }))
                 .then(Commands.literal("reload").executes(context -> {
@@ -113,26 +148,36 @@ public final class WeaponAffixes {
         return Optional.of(chosen.id);
     }
 
-    /** Per-hit proc multiplier. Static damage/speed/reach modifiers are already handled by the item attributes. */
+    /** Per-hit proc multiplier. Runtime proc values are stored on the stack, not re-read from config. */
     public static float rollHitDamageMultiplier(ItemStack stack, RandomSource random) {
-        AffixDefinition def = definition(stack).orElse(null);
-        if (def == null || def.procChance <= 0.0 || def.procDamageMultiplier <= 1.0) {
+        StoredAffix affix = readStored(stack).orElse(null);
+        if (affix == null || affix.procChance <= 0.0 || affix.procDamageMultiplier <= 1.0) {
             return 1.0F;
         }
-        return random.nextDouble() < def.procChance ? (float) def.procDamageMultiplier : 1.0F;
+        return random.nextDouble() < affix.procChance ? (float) affix.procDamageMultiplier : 1.0F;
     }
 
     public static Optional<String> readId(ItemStack stack) {
+        return readStored(stack).map(StoredAffix::id);
+    }
+
+    private static Optional<StoredAffix> readStored(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return Optional.empty();
         CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
         if (custom == null) return Optional.empty();
         CompoundTag stored = custom.copyTag().getCompoundOrEmpty(ROOT);
         if (stored.isEmpty() || stored.getIntOr("v", 0) != FORMAT) return Optional.empty();
-        return stored.getString("id").filter(BY_ID::containsKey);
-    }
-
-    private static Optional<AffixDefinition> definition(ItemStack stack) {
-        return readId(stack).map(BY_ID::get);
+        Optional<String> id = stored.getString("id");
+        if (id.isEmpty()) return Optional.empty();
+        return Optional.of(new StoredAffix(
+            id.get(),
+            stored.getDoubleOr("damageMultiplier", 1.0),
+            stored.getDoubleOr("attackSpeedMultiplier", 1.0),
+            stored.getDoubleOr("reachAdd", 0.0),
+            stored.getDoubleOr("durabilityMultiplier", 1.0),
+            stored.getDoubleOr("procChance", 0.0),
+            stored.getDoubleOr("procDamageMultiplier", 1.0)
+        ));
     }
 
     private static void apply(ItemStack stack, AffixDefinition def) {
@@ -174,6 +219,12 @@ public final class WeaponAffixes {
         CompoundTag stored = new CompoundTag();
         stored.putInt("v", FORMAT);
         stored.putString("id", def.id);
+        stored.putDouble("damageMultiplier", def.damageMultiplier);
+        stored.putDouble("attackSpeedMultiplier", def.attackSpeedMultiplier);
+        stored.putDouble("reachAdd", def.reachAdd);
+        stored.putDouble("durabilityMultiplier", def.durabilityMultiplier);
+        stored.putDouble("procChance", def.procChance);
+        stored.putDouble("procDamageMultiplier", def.procDamageMultiplier);
         root.put(ROOT, stored);
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(root));
 
@@ -270,6 +321,16 @@ public final class WeaponAffixes {
         ));
         return c;
     }
+
+    private record StoredAffix(
+        String id,
+        double damageMultiplier,
+        double attackSpeedMultiplier,
+        double reachAdd,
+        double durabilityMultiplier,
+        double procChance,
+        double procDamageMultiplier
+    ) {}
 
     public static final class AffixConfig {
         public double rollChance = 0.70;
