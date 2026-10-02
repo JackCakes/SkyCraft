@@ -92,7 +92,12 @@ public class SkyrimActorEntity extends LivingEntity {
 			return;
 		}
 		ItemStack affixWeapon = source.getWeaponItem();
-		if (affixWeapon == null && source.getEntity() instanceof LivingEntity attacker) {
+		// Only infer the attacker's held weapon for a direct melee-style hit. Damage-over-time
+		// sources can still remember a player as their owner; using that player's current main hand
+		// would let a Volatile sword randomly multiply unrelated fire/poison ticks.
+		if (affixWeapon == null
+				&& source.getDirectEntity() == source.getEntity()
+				&& source.getEntity() instanceof LivingEntity attacker) {
 			affixWeapon = attacker.getMainHandItem();
 		}
 		float affixMultiplier = dev.skycraft.weapon.WeaponAffixes.rollHitDamageMultiplier(affixWeapon, this.getRandom());
