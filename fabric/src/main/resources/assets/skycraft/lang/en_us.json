@@ -1,3 +1,6 @@
 {
-  "entity.skycraft.skyrim_actor": "Skyrim NPC"
+  "item.skycraft.skyrim_iron_dagger": "Iron Dagger (Skyrim)",
+  "item.skycraft.skyrim_iron_sword": "Iron Sword (Skyrim)",
+  "item.skycraft.skyrim_iron_greatsword": "Iron Greatsword (Skyrim)",
+  "item.skycraft.skyrim_iron_battleaxe": "Iron Battleaxe (Skyrim)"
 }

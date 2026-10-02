@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "notes": "Experimental common-weapon mapping. Unique/enchanted/quest weapons intentionally excluded.",
+  "mappings": [
+    { "name": "Iron Dagger",     "skyrimFormId": "0001397E", "minecraftItem": "skycraft:skyrim_iron_dagger",     "enabled": true },
+    { "name": "Iron Sword",      "skyrimFormId": "00012EB7", "minecraftItem": "skycraft:skyrim_iron_sword",      "enabled": true },
+    { "name": "Iron Greatsword", "skyrimFormId": "0001359D", "minecraftItem": "skycraft:skyrim_iron_greatsword", "enabled": true },
+    { "name": "Iron Battleaxe",  "skyrimFormId": "00013980", "minecraftItem": "skycraft:skyrim_iron_battleaxe",  "enabled": true }
+  ]
+}
