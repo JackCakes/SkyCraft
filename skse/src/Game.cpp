@@ -185,6 +185,29 @@ namespace skycraft
 			return m;
 		}
 
+		RE::NiMatrix3 CameraBasisFromMc(const float a_forward[3], const float a_up[3])
+		{
+			auto normalize = [](RE::NiPoint3 a_v) {
+				const float len = a_v.Length();
+				return len > 1.0e-5f ? a_v * (1.0f / len) : RE::NiPoint3{};
+			};
+			// MC-space is X east, Y up, Z south. Skyrim is X east, Y north, Z up.
+			RE::NiPoint3 f = normalize({ a_forward[0], -a_forward[2], a_forward[1] });
+			RE::NiPoint3 u = normalize({ a_up[0], -a_up[2], a_up[1] });
+			RE::NiPoint3 r = normalize(f.Cross(u));
+			u = normalize(r.Cross(f));
+			RE::NiMatrix3 m{};
+			const float fv[3] = { f.x, f.y, f.z };
+			const float uv[3] = { u.x, u.y, u.z };
+			const float rv[3] = { r.x, r.y, r.z };
+			for (int i = 0; i < 3; ++i) {
+				m.entry[i][0] = fv[i];
+				m.entry[i][1] = uv[i];
+				m.entry[i][2] = rv[i];
+			}
+			return m;
+		}
+
 		// Turns the camera root to the Minecraft look (once Skyrim's axis convention is known).
 		void ApplyLookRotation(RE::NiAVObject* a_root)
 		{
@@ -689,6 +712,12 @@ namespace skycraft
 					(skateState.y - currentMc.y) * (skateState.y - currentMc.y) +
 					(skateState.z - currentMc.z) * (skateState.z - currentMc.z)) :
 				std::numeric_limits<double>::infinity();
+			const bool skateCameraFinite =
+				haveSkateState &&
+				std::isfinite(skateState.cameraPos[0]) && std::isfinite(skateState.cameraPos[1]) && std::isfinite(skateState.cameraPos[2]) &&
+				std::isfinite(skateState.cameraForward[0]) && std::isfinite(skateState.cameraForward[1]) && std::isfinite(skateState.cameraForward[2]) &&
+				std::isfinite(skateState.cameraUp[0]) && std::isfinite(skateState.cameraUp[1]) && std::isfinite(skateState.cameraUp[2]) &&
+				std::isfinite(skateState.fovDeg) && skateState.fovDeg > 1.0f && skateState.fovDeg < 179.0f;
 			const bool skateHostActive =
 				skatePoseFinite &&
 				(skateState.flags & skateproto::kHostReady) != 0 &&
@@ -754,7 +783,7 @@ namespace skycraft
 				SyncSneak(a_player, (mc.flags & proto::kMcSneaking) != 0, a_delta);
 			}
 			if (ui) {
-				HideCrosshair(ui, puppet, a_player->AsActorState()->actorState1.sneaking);
+				HideCrosshair(ui, puppet || skateAuthority, a_player->AsActorState()->actorState1.sneaking);
 			}
 			st.mcCrosshair = puppet && mc.cameraMode == 0 && !st.mcScreenOpen && !st.skyrimMenuOpen;
 			st.mcGuiScale = haveMc ? static_cast<int>(mc.guiScale) : 0;
@@ -902,9 +931,41 @@ namespace skycraft
 				lastSetPos = pos;
 				haveLastSet = true;
 				current = pos;
-			}
+				st.feetX = skateState.x;
+				st.feetY = skateState.y;
+				st.feetZ = skateState.z;
+				st.feetValid = true;
+				HideFirstPersonMeshes(a_player, true);
 
-			if (puppet) {
+				const bool hostCamera =
+					(skateState.flags & skateproto::kHostCameraValid) != 0 && skateCameraFinite;
+				if (hostCamera) {
+					eyePos = McToSky(
+						skateState.cameraPos[0],
+						skateState.cameraPos[1],
+						skateState.cameraPos[2]);
+					eyeValid = true;
+					idealRot = CameraBasisFromMc(skateState.cameraForward, skateState.cameraUp);
+					idealRotNoRoll = idealRot;
+					idealValid = !st.skyrimMenuOpen && rotValidated;
+					if (auto* camera = RE::PlayerCamera::GetSingleton(); camera && camera->cameraRoot) {
+						if (!camera->IsInFirstPerson()) {
+							camera->ForceFirstPerson();
+						}
+						auto* root = camera->cameraRoot.get();
+						if (idealValid) {
+							ApplyLookRotation(root);
+						}
+						PinCameraAndSky();
+						ApplyMcFov(camera, skateState.fovDeg);
+						RE::NiUpdateData update{};
+						root->UpdateDownwardPass(update, 0);
+					}
+				} else {
+					eyeValid = false;
+					idealValid = false;
+				}
+			} else if (puppet) {
 				const auto pos = McToSky(feetX, feetY, feetZ);
 				a_player->SetPosition(pos, true);
 				if (auto* controller = a_player->GetCharController()) {
@@ -1090,7 +1151,7 @@ namespace skycraft
 			hudTimer -= a_delta;
 			if (hudTimer <= 0.0f) {
 				hudTimer = 0.5f;
-				HideHud(ui, puppet);
+				HideHud(ui, puppet || skateAuthority);
 			}
 
 			// Tell Minecraft where Skyrim's player is and where they're looking.
