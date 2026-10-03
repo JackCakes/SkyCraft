@@ -151,14 +151,14 @@ public final class RangedMagic {
 
         if (spell == Spell.LESSER_WARD) {
             // Keep a short resistance effect refreshed only while the ward is actively held.
-            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 6, 0, true, false));
+            player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 6, 0, true, false));
             spawnWard(level, player, from);
             return;
         }
 
         if (spell == Spell.OAKFLESH) {
             // Early Alteration equivalent: a one-minute protective skin buff.
-            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 20 * 60, 0, true, false));
+            player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 20 * 60, 0, true, false));
             spawnOakflesh(level, player);
             player.stopUsingItem();
             return;
