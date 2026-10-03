@@ -1,35 +1,35 @@
 {
   "parent": "minecraft:item/handheld",
   "textures": {
-    "layer0": "skycraft:item/skyrim_steel_dagger"
+    "layer0": "skycraft:item/skyrim_steel_warhammer"
   },
   "display": {
     "firstperson_righthand": {
       "scale": [
-        1.15,
-        1.15,
-        1.15
+        1.9,
+        1.9,
+        1.9
       ]
     },
     "firstperson_lefthand": {
       "scale": [
-        1.15,
-        1.15,
-        1.15
+        1.9,
+        1.9,
+        1.9
       ]
     },
     "thirdperson_righthand": {
       "scale": [
-        1.15,
-        1.15,
-        1.15
+        1.9,
+        1.9,
+        1.9
       ]
     },
     "thirdperson_lefthand": {
       "scale": [
-        1.15,
-        1.15,
-        1.15
+        1.9,
+        1.9,
+        1.9
       ]
     }
   }
