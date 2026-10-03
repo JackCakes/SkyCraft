@@ -108,9 +108,9 @@ public final class RangedMagic {
 
         @Override
         public InteractionResult use(Level level, net.minecraft.world.entity.player.Player player, InteractionHand hand) {
-            if (spell == Spell.FIREBOLT || spell == Spell.ICE_SPIKE || spell == Spell.LIGHTNING_BOLT) {
+            if (spell.castStyle == CastStyle.INSTANT) {
                 if (player instanceof ServerPlayer serverPlayer && level instanceof ServerLevel serverLevel) {
-                    castBolt(serverLevel, serverPlayer, spell);
+                    castCharged(serverLevel, serverPlayer, spell);
                 }
                 return InteractionResult.SUCCESS;
             }
@@ -134,7 +134,18 @@ public final class RangedMagic {
             if (!(level instanceof ServerLevel serverLevel) || !(living instanceof ServerPlayer player)) {
                 return;
             }
-            channelTick(serverLevel, player, spell, ticksRemaining);
+            if (spell.castStyle == CastStyle.CONCENTRATION) {
+                channelTick(serverLevel, player, spell, ticksRemaining);
+                return;
+            }
+            if (spell.castStyle == CastStyle.CHARGED) {
+                int elapsed = 72000 - ticksRemaining;
+                spawnCharge(serverLevel, player, spell, elapsed);
+                if (elapsed >= spell.chargeTicks) {
+                    castCharged(serverLevel, player, spell);
+                    player.stopUsingItem();
+                }
+            }
         }
     }
 
@@ -153,23 +164,6 @@ public final class RangedMagic {
             // Keep a short resistance effect refreshed only while the ward is actively held.
             player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 6, 0, true, false));
             spawnWard(level, player, from);
-            return;
-        }
-
-        if (spell == Spell.OAKFLESH) {
-            // Early Alteration equivalent: a one-minute protective skin buff.
-            player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 20 * 60, 0, true, false));
-            spawnOakflesh(level, player);
-            player.stopUsingItem();
-            return;
-        }
-
-        if (spell == Spell.CANDLELIGHT) {
-            // Minecraft has no portable light orb without a block/entity; Night Vision is the
-            // closest non-destructive equivalent and the cast still gets a visible light aura.
-            player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 20 * 60, 0, true, false));
-            spawnCandlelight(level, player);
-            player.stopUsingItem();
             return;
         }
 
@@ -317,6 +311,38 @@ public final class RangedMagic {
         level.sendParticles(ParticleTypes.HEART, chest.x, chest.y, chest.z, 1, 0.18, 0.22, 0.18, 0.0);
     }
 
+    private static void castCharged(ServerLevel level, ServerPlayer player, Spell spell) {
+        if (spell == Spell.OAKFLESH) {
+            player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 20 * 60, 0, true, false));
+            spawnOakflesh(level, player);
+            return;
+        }
+        if (spell == Spell.CANDLELIGHT) {
+            player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 20 * 60, 0, true, false));
+            spawnCandlelight(level, player);
+            return;
+        }
+        if (spell == Spell.FIREBOLT || spell == Spell.ICE_SPIKE || spell == Spell.LIGHTNING_BOLT) {
+            castBolt(level, player, spell);
+        }
+    }
+
+    private static void spawnCharge(ServerLevel level, ServerPlayer player, Spell spell, int elapsed) {
+        Vec3 hand = handPosition(player);
+        double spread = Math.max(0.02, 0.12 - Math.min(elapsed, spell.chargeTicks) * 0.004);
+        if (spell == Spell.FIREBOLT) {
+            level.sendParticles(ParticleTypes.FLAME, hand.x, hand.y, hand.z, 3, spread, spread, spread, 0.004);
+        } else if (spell == Spell.ICE_SPIKE) {
+            level.sendParticles(ParticleTypes.SNOWFLAKE, hand.x, hand.y, hand.z, 3, spread, spread, spread, 0.003);
+        } else if (spell == Spell.LIGHTNING_BOLT) {
+            level.sendParticles(ParticleTypes.ELECTRIC_SPARK, hand.x, hand.y, hand.z, 4, spread, spread, spread, 0.015);
+        } else if (spell == Spell.OAKFLESH) {
+            level.sendParticles(ParticleTypes.CRIT, hand.x, hand.y, hand.z, 2, spread, spread, spread, 0.0);
+        } else if (spell == Spell.CANDLELIGHT) {
+            level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, spread, spread, spread, 0.004);
+        }
+    }
+
     private static void castBolt(ServerLevel level, ServerPlayer player, Spell spell) {
         Vec3 from = handPosition(player);
         SkyrimActorEntity target = SkyCombat.findTarget(player, 36.0);
@@ -373,23 +399,33 @@ public final class RangedMagic {
         level.sendParticles(ParticleTypes.FIREWORK, above.x, above.y, above.z, 8, 0.16, 0.16, 0.16, 0.01);
     }
 
+    public enum CastStyle {
+        CONCENTRATION,
+        CHARGED,
+        INSTANT
+    }
+
     public enum Spell {
-        FLAMES(0.9F),
-        FROSTBITE(0.7F),
-        SPARKS(0.8F),
-        HEALING(0.0F),
-        GREATER_HEALING(0.0F),
-        LESSER_WARD(0.0F),
-        OAKFLESH(0.0F),
-        CANDLELIGHT(0.0F),
-        FIREBOLT(0.0F),
-        ICE_SPIKE(0.0F),
-        LIGHTNING_BOLT(0.0F);
+        FLAMES(0.9F, CastStyle.CONCENTRATION, 0),
+        FROSTBITE(0.7F, CastStyle.CONCENTRATION, 0),
+        SPARKS(0.8F, CastStyle.CONCENTRATION, 0),
+        HEALING(0.0F, CastStyle.CONCENTRATION, 0),
+        GREATER_HEALING(0.0F, CastStyle.CONCENTRATION, 0),
+        LESSER_WARD(0.0F, CastStyle.CONCENTRATION, 0),
+        OAKFLESH(0.0F, CastStyle.CHARGED, 12),
+        CANDLELIGHT(0.0F, CastStyle.CHARGED, 10),
+        FIREBOLT(0.0F, CastStyle.CHARGED, 8),
+        ICE_SPIKE(0.0F, CastStyle.CHARGED, 10),
+        LIGHTNING_BOLT(0.0F, CastStyle.CHARGED, 8);
 
         final float damagePerPulse;
+        final CastStyle castStyle;
+        final int chargeTicks;
 
-        Spell(float damagePerPulse) {
+        Spell(float damagePerPulse, CastStyle castStyle, int chargeTicks) {
             this.damagePerPulse = damagePerPulse;
+            this.castStyle = castStyle;
+            this.chargeTicks = chargeTicks;
         }
     }
 }
