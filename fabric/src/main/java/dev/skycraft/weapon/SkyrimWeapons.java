@@ -87,6 +87,7 @@ public final class SkyrimWeapons {
         add("skyrim_iron_greatsword", MaterialTier.IRON, WeaponClass.GREATSWORD);
         add("skyrim_iron_battleaxe", MaterialTier.IRON, WeaponClass.BATTLEAXE);
 
+        addTier("steel", MaterialTier.STEEL);
         add("skyrim_dwarven_dagger", MaterialTier.DWARVEN, WeaponClass.DAGGER);
         add("skyrim_dwarven_sword", MaterialTier.DWARVEN, WeaponClass.SWORD);
         add("skyrim_dwarven_war_axe", MaterialTier.DWARVEN, WeaponClass.WAR_AXE);
@@ -94,6 +95,18 @@ public final class SkyrimWeapons {
         add("skyrim_dwarven_greatsword", MaterialTier.DWARVEN, WeaponClass.GREATSWORD);
         add("skyrim_dwarven_battleaxe", MaterialTier.DWARVEN, WeaponClass.BATTLEAXE);
         add("skyrim_dwarven_warhammer", MaterialTier.DWARVEN, WeaponClass.WARHAMMER);
+
+        addTier("orcish", MaterialTier.ORCISH);
+    }
+
+    private static void addTier(String materialName, MaterialTier material) {
+        add("skyrim_" + materialName + "_dagger", material, WeaponClass.DAGGER);
+        add("skyrim_" + materialName + "_sword", material, WeaponClass.SWORD);
+        add("skyrim_" + materialName + "_war_axe", material, WeaponClass.WAR_AXE);
+        add("skyrim_" + materialName + "_mace", material, WeaponClass.MACE);
+        add("skyrim_" + materialName + "_greatsword", material, WeaponClass.GREATSWORD);
+        add("skyrim_" + materialName + "_battleaxe", material, WeaponClass.BATTLEAXE);
+        add("skyrim_" + materialName + "_warhammer", material, WeaponClass.WARHAMMER);
     }
 
     private static void add(String id, MaterialTier material, WeaponClass weaponClass) {
@@ -129,7 +142,7 @@ public final class SkyrimWeapons {
                             player.getInventory().add(new ItemStack(item));
                         }
                     }
-                    player.sendSystemMessage(Component.literal("SkyCraft weapon test kit added: " + DEFAULTS.size() + " weapons across Iron and Dwarven tiers."));
+                    player.sendSystemMessage(Component.literal("SkyCraft weapon test kit added: " + DEFAULTS.size() + " weapons across Iron, Steel, Dwarven and Orcish tiers."));
                     return 1;
                 })));
         });
