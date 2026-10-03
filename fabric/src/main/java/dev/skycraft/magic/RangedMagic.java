@@ -45,6 +45,7 @@ public final class RangedMagic {
     public static Item SPARKS;
     public static Item HEALING;
     public static Item GREATER_HEALING;
+    public static Item FAST_HEALING;
     public static Item LESSER_WARD;
     public static Item OAKFLESH;
     public static Item CANDLELIGHT;
@@ -60,6 +61,7 @@ public final class RangedMagic {
         SPARKS = register("sparks", Spell.SPARKS);
         HEALING = register("healing", Spell.HEALING);
         GREATER_HEALING = register("greater_healing", Spell.GREATER_HEALING);
+        FAST_HEALING = register("fast_healing", Spell.FAST_HEALING);
         LESSER_WARD = register("lesser_ward", Spell.LESSER_WARD);
         OAKFLESH = register("oakflesh", Spell.OAKFLESH);
         CANDLELIGHT = register("candlelight", Spell.CANDLELIGHT);
@@ -78,6 +80,7 @@ public final class RangedMagic {
                     player.getInventory().add(new ItemStack(SPARKS));
                     player.getInventory().add(new ItemStack(HEALING));
                     player.getInventory().add(new ItemStack(GREATER_HEALING));
+                    player.getInventory().add(new ItemStack(FAST_HEALING));
                     player.getInventory().add(new ItemStack(LESSER_WARD));
                     player.getInventory().add(new ItemStack(OAKFLESH));
                     player.getInventory().add(new ItemStack(CANDLELIGHT));
@@ -242,6 +245,7 @@ public final class RangedMagic {
         if (stack.is(SPARKS)) return Spell.SPARKS;
         if (stack.is(HEALING)) return Spell.HEALING;
         if (stack.is(GREATER_HEALING)) return Spell.GREATER_HEALING;
+        if (stack.is(FAST_HEALING)) return Spell.FAST_HEALING;
         if (stack.is(LESSER_WARD)) return Spell.LESSER_WARD;
         if (stack.is(OAKFLESH)) return Spell.OAKFLESH;
         if (stack.is(CANDLELIGHT)) return Spell.CANDLELIGHT;
@@ -312,6 +316,11 @@ public final class RangedMagic {
     }
 
     private static void castCharged(ServerLevel level, ServerPlayer player, Spell spell) {
+        if (spell == Spell.FAST_HEALING) {
+            player.heal(4.0F);
+            spawnHealing(level, player, handPosition(player), true);
+            return;
+        }
         if (spell == Spell.OAKFLESH) {
             player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 20 * 60, 0, true, false));
             spawnOakflesh(level, player);
@@ -340,6 +349,8 @@ public final class RangedMagic {
             level.sendParticles(ParticleTypes.CRIT, hand.x, hand.y, hand.z, 2, spread, spread, spread, 0.0);
         } else if (spell == Spell.CANDLELIGHT) {
             level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, spread, spread, spread, 0.004);
+        } else if (spell == Spell.FAST_HEALING) {
+            level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, spread, spread, spread, 0.003);
         }
     }
 
@@ -411,6 +422,7 @@ public final class RangedMagic {
         SPARKS(0.8F, CastStyle.CONCENTRATION, 0),
         HEALING(0.0F, CastStyle.CONCENTRATION, 0),
         GREATER_HEALING(0.0F, CastStyle.CONCENTRATION, 0),
+        FAST_HEALING(0.0F, CastStyle.CHARGED, 8),
         LESSER_WARD(0.0F, CastStyle.CONCENTRATION, 0),
         OAKFLESH(0.0F, CastStyle.CHARGED, 12),
         CANDLELIGHT(0.0F, CastStyle.CHARGED, 10),
