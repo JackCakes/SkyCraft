@@ -55,6 +55,7 @@ public final class RangedMagic {
     public static Item ICE_SPIKE;
     public static Item LIGHTNING_BOLT;
     public static Item GRAND_HEALING;
+    public static Item GUARDIAN_CIRCLE;
 
     private RangedMagic() {}
 
@@ -74,6 +75,7 @@ public final class RangedMagic {
         ICE_SPIKE = register("ice_spike", Spell.ICE_SPIKE);
         LIGHTNING_BOLT = register("lightning_bolt", Spell.LIGHTNING_BOLT);
         GRAND_HEALING = register("grand_healing", Spell.GRAND_HEALING);
+        GUARDIAN_CIRCLE = register("guardian_circle", Spell.GUARDIAN_CIRCLE);
 
         ServerTickEvents.END_SERVER_TICK.register(RangedMagic::idleHandEffects);
 
@@ -96,6 +98,7 @@ public final class RangedMagic {
                     player.getInventory().add(new ItemStack(ICE_SPIKE));
                     player.getInventory().add(new ItemStack(LIGHTNING_BOLT));
                     player.getInventory().add(new ItemStack(GRAND_HEALING));
+                    player.getInventory().add(new ItemStack(GUARDIAN_CIRCLE));
                     player.sendSystemMessage(Component.literal(
                         "SkyCraft magic demo added: novice set plus Firebolt, Ice Spike and Lightning Bolt."));
                     return 1;
@@ -265,6 +268,7 @@ public final class RangedMagic {
         if (stack.is(ICE_SPIKE)) return Spell.ICE_SPIKE;
         if (stack.is(LIGHTNING_BOLT)) return Spell.LIGHTNING_BOLT;
         if (stack.is(GRAND_HEALING)) return Spell.GRAND_HEALING;
+        if (stack.is(GUARDIAN_CIRCLE)) return Spell.GUARDIAN_CIRCLE;
         return null;
     }
 
@@ -329,6 +333,11 @@ public final class RangedMagic {
     }
 
     private static void castCharged(ServerLevel level, ServerPlayer player, Spell spell) {
+        if (spell == Spell.GUARDIAN_CIRCLE) {
+            player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 20 * 30, 1, true, false));
+            spawnGuardianCircle(level, player);
+            return;
+        }
         if (spell == Spell.GRAND_HEALING) {
             player.heal(12.0F);
             spawnHealing(level, player, handPosition(player), true);
@@ -376,7 +385,7 @@ public final class RangedMagic {
             level.sendParticles(ParticleTypes.CRIT, hand.x, hand.y, hand.z, 2, spread, spread, spread, 0.0);
         } else if (spell == Spell.CANDLELIGHT) {
             level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, spread, spread, spread, 0.004);
-        } else if (spell == Spell.FAST_HEALING || spell == Spell.CLOSE_WOUNDS || spell == Spell.GRAND_HEALING) {
+        } else if (spell == Spell.FAST_HEALING || spell == Spell.CLOSE_WOUNDS || spell == Spell.GRAND_HEALING || spell == Spell.GUARDIAN_CIRCLE) {
             level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, spread, spread, spread, 0.003);
         }
     }
@@ -431,6 +440,19 @@ public final class RangedMagic {
         level.sendParticles(ParticleTypes.SMOKE, center.x, center.y, center.z, 6, 0.28, 0.55, 0.28, 0.005);
     }
 
+    private static void spawnGuardianCircle(ServerLevel level, ServerPlayer player) {
+        Vec3 center = player.position().add(0.0, 0.08, 0.0);
+        // A restrained restoration ring: readable as an area spell without filling the screen.
+        for (int i = 0; i < 20; i++) {
+            double angle = (Math.PI * 2.0 * i) / 20.0;
+            double radius = 2.2;
+            double x = center.x + Math.cos(angle) * radius;
+            double z = center.z + Math.sin(angle) * radius;
+            level.sendParticles(ParticleTypes.END_ROD, x, center.y, z, 1, 0.03, 0.02, 0.03, 0.0);
+        }
+        level.sendParticles(ParticleTypes.HEART, center.x, center.y + 0.8, center.z, 5, 1.2, 0.25, 1.2, 0.0);
+    }
+
     private static void spawnCandlelight(ServerLevel level, ServerPlayer player) {
         Vec3 above = player.getEyePosition().add(0.0, 0.65, 0.0);
         level.sendParticles(ParticleTypes.END_ROD, above.x, above.y, above.z, 18, 0.20, 0.20, 0.20, 0.01);
@@ -458,7 +480,8 @@ public final class RangedMagic {
         FIREBOLT(0.0F, CastStyle.CHARGED, 8),
         ICE_SPIKE(0.0F, CastStyle.CHARGED, 10),
         LIGHTNING_BOLT(0.0F, CastStyle.CHARGED, 8),
-        GRAND_HEALING(0.0F, CastStyle.CHARGED, 16);
+        GRAND_HEALING(0.0F, CastStyle.CHARGED, 16),
+        GUARDIAN_CIRCLE(0.0F, CastStyle.CHARGED, 20);
 
         final float damagePerPulse;
         final CastStyle castStyle;
