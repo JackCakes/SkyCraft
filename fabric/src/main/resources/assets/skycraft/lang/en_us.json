@@ -32,5 +32,8 @@
   "item.skycraft.frostbite": "Frostbite",
   "item.skycraft.sparks": "Sparks",
   "item.skycraft.healing": "Healing",
-  "item.skycraft.greater_healing": "Greater Healing"
+  "item.skycraft.greater_healing": "Greater Healing",
+  "item.skycraft.lesser_ward": "Lesser Ward",
+  "item.skycraft.oakflesh": "Oakflesh",
+  "item.skycraft.candlelight": "Candlelight"
 }
