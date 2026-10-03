@@ -42,6 +42,7 @@ public final class RangedMagic {
     public static Item FROSTBITE;
     public static Item SPARKS;
     public static Item HEALING;
+    public static Item GREATER_HEALING;
 
     private RangedMagic() {}
 
@@ -50,6 +51,7 @@ public final class RangedMagic {
         FROSTBITE = register("frostbite", Spell.FROSTBITE);
         SPARKS = register("sparks", Spell.SPARKS);
         HEALING = register("healing", Spell.HEALING);
+        GREATER_HEALING = register("greater_healing", Spell.GREATER_HEALING);
 
         ServerTickEvents.END_SERVER_TICK.register(RangedMagic::idleHandEffects);
 
@@ -61,6 +63,7 @@ public final class RangedMagic {
                     player.getInventory().add(new ItemStack(FROSTBITE));
                     player.getInventory().add(new ItemStack(SPARKS));
                     player.getInventory().add(new ItemStack(HEALING));
+                    player.getInventory().add(new ItemStack(GREATER_HEALING));
                     player.sendSystemMessage(Component.literal(
                         "SkyCraft magic demo added: Flames, Frostbite, Sparks + Healing. Equip one and hold right-click to channel."));
                     return 1;
@@ -112,10 +115,10 @@ public final class RangedMagic {
     private static void channelTick(ServerLevel level, ServerPlayer player, Spell spell, int ticksRemaining) {
         Vec3 from = handPosition(player);
 
-        if (spell == Spell.HEALING) {
-            spawnHealing(level, player, from);
+        if (spell == Spell.HEALING || spell == Spell.GREATER_HEALING) {
+            spawnHealing(level, player, from, spell == Spell.GREATER_HEALING);
             if (ticksRemaining % 5 == 0 && player.getHealth() < player.getMaxHealth()) {
-                player.heal(0.6F);
+                player.heal(spell == Spell.GREATER_HEALING ? 1.2F : 0.6F);
             }
             return;
         }
@@ -182,6 +185,7 @@ public final class RangedMagic {
         if (stack.is(FROSTBITE)) return Spell.FROSTBITE;
         if (stack.is(SPARKS)) return Spell.SPARKS;
         if (stack.is(HEALING)) return Spell.HEALING;
+        if (stack.is(GREATER_HEALING)) return Spell.GREATER_HEALING;
         return null;
     }
 
@@ -238,9 +242,9 @@ public final class RangedMagic {
         }
     }
 
-    private static void spawnHealing(ServerLevel level, ServerPlayer player, Vec3 hand) {
-        level.sendParticles(ParticleTypes.HEART, hand.x, hand.y, hand.z, 2, 0.10, 0.10, 0.10, 0.0);
-        level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, 0.12, 0.12, 0.12, 0.005);
+    private static void spawnHealing(ServerLevel level, ServerPlayer player, Vec3 hand, boolean greater) {
+        level.sendParticles(ParticleTypes.HEART, hand.x, hand.y, hand.z, greater ? 4 : 2, 0.10, 0.10, 0.10, 0.0);
+        level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, greater ? 5 : 2, 0.12, 0.12, 0.12, 0.005);
         Vec3 chest = player.position().add(0.0, player.getBbHeight() * 0.62, 0.0);
         level.sendParticles(ParticleTypes.HEART, chest.x, chest.y, chest.z, 1, 0.18, 0.22, 0.18, 0.0);
     }
@@ -249,7 +253,8 @@ public final class RangedMagic {
         FLAMES(0.9F),
         FROSTBITE(0.7F),
         SPARKS(0.8F),
-        HEALING(0.0F);
+        HEALING(0.0F),
+        GREATER_HEALING(0.0F);
 
         final float damagePerPulse;
 
