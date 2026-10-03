@@ -1,7 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "skycraft:item/frostbolt"
+    "layer0": "skycraft:item/ice_spike"
   },
   "display": {
     "firstperson_righthand": {
