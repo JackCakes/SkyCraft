@@ -48,6 +48,9 @@ public final class RangedMagic {
     public static Item LESSER_WARD;
     public static Item OAKFLESH;
     public static Item CANDLELIGHT;
+    public static Item FIREBOLT;
+    public static Item ICE_SPIKE;
+    public static Item LIGHTNING_BOLT;
 
     private RangedMagic() {}
 
@@ -60,6 +63,9 @@ public final class RangedMagic {
         LESSER_WARD = register("lesser_ward", Spell.LESSER_WARD);
         OAKFLESH = register("oakflesh", Spell.OAKFLESH);
         CANDLELIGHT = register("candlelight", Spell.CANDLELIGHT);
+        FIREBOLT = register("firebolt", Spell.FIREBOLT);
+        ICE_SPIKE = register("ice_spike", Spell.ICE_SPIKE);
+        LIGHTNING_BOLT = register("lightning_bolt", Spell.LIGHTNING_BOLT);
 
         ServerTickEvents.END_SERVER_TICK.register(RangedMagic::idleHandEffects);
 
@@ -75,8 +81,11 @@ public final class RangedMagic {
                     player.getInventory().add(new ItemStack(LESSER_WARD));
                     player.getInventory().add(new ItemStack(OAKFLESH));
                     player.getInventory().add(new ItemStack(CANDLELIGHT));
+                    player.getInventory().add(new ItemStack(FIREBOLT));
+                    player.getInventory().add(new ItemStack(ICE_SPIKE));
+                    player.getInventory().add(new ItemStack(LIGHTNING_BOLT));
                     player.sendSystemMessage(Component.literal(
-                        "SkyCraft magic demo added: Flames, Frostbite, Sparks, Healing, Greater Healing, Lesser Ward, Oakflesh + Candlelight."));
+                        "SkyCraft magic demo added: novice set plus Firebolt, Ice Spike and Lightning Bolt."));
                     return 1;
                 })));
         });
@@ -99,6 +108,12 @@ public final class RangedMagic {
 
         @Override
         public InteractionResult use(Level level, net.minecraft.world.entity.player.Player player, InteractionHand hand) {
+            if (spell == Spell.FIREBOLT || spell == Spell.ICE_SPIKE || spell == Spell.LIGHTNING_BOLT) {
+                if (player instanceof ServerPlayer serverPlayer && level instanceof ServerLevel serverLevel) {
+                    castBolt(serverLevel, serverPlayer, spell);
+                }
+                return InteractionResult.SUCCESS;
+            }
             player.startUsingItem(hand);
             return InteractionResult.CONSUME;
         }
@@ -217,6 +232,12 @@ public final class RangedMagic {
                 level.sendParticles(ParticleTypes.CRIT, hand.x, hand.y, hand.z, 1, 0.08, 0.08, 0.08, 0.0);
             } else if (spell == Spell.CANDLELIGHT) {
                 level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, 0.08, 0.08, 0.08, 0.004);
+            } else if (spell == Spell.FIREBOLT) {
+                level.sendParticles(ParticleTypes.FLAME, hand.x, hand.y, hand.z, 2, 0.06, 0.06, 0.06, 0.003);
+            } else if (spell == Spell.ICE_SPIKE) {
+                level.sendParticles(ParticleTypes.SNOWFLAKE, hand.x, hand.y, hand.z, 2, 0.06, 0.06, 0.06, 0.002);
+            } else if (spell == Spell.LIGHTNING_BOLT) {
+                level.sendParticles(ParticleTypes.ELECTRIC_SPARK, hand.x, hand.y, hand.z, 2, 0.06, 0.06, 0.06, 0.01);
             }
         }
     }
@@ -230,6 +251,9 @@ public final class RangedMagic {
         if (stack.is(LESSER_WARD)) return Spell.LESSER_WARD;
         if (stack.is(OAKFLESH)) return Spell.OAKFLESH;
         if (stack.is(CANDLELIGHT)) return Spell.CANDLELIGHT;
+        if (stack.is(FIREBOLT)) return Spell.FIREBOLT;
+        if (stack.is(ICE_SPIKE)) return Spell.ICE_SPIKE;
+        if (stack.is(LIGHTNING_BOLT)) return Spell.LIGHTNING_BOLT;
         return null;
     }
 
@@ -293,6 +317,43 @@ public final class RangedMagic {
         level.sendParticles(ParticleTypes.HEART, chest.x, chest.y, chest.z, 1, 0.18, 0.22, 0.18, 0.0);
     }
 
+    private static void castBolt(ServerLevel level, ServerPlayer player, Spell spell) {
+        Vec3 from = handPosition(player);
+        SkyrimActorEntity target = SkyCombat.findTarget(player, 36.0);
+        Vec3 to = target != null ? target.getBoundingBox().getCenter()
+            : from.add(player.getLookAngle().scale(36.0));
+
+        Vec3 delta = to.subtract(from);
+        int steps = Math.max(4, (int) Math.ceil(delta.length() * 3.0));
+        for (int i = 0; i <= steps; i++) {
+            Vec3 p = from.add(delta.scale((double) i / steps));
+            if (spell == Spell.FIREBOLT) {
+                level.sendParticles(ParticleTypes.FLAME, p.x, p.y, p.z, 1, 0.035, 0.035, 0.035, 0.002);
+            } else if (spell == Spell.ICE_SPIKE) {
+                level.sendParticles(ParticleTypes.SNOWFLAKE, p.x, p.y, p.z, 1, 0.025, 0.025, 0.025, 0.001);
+                if ((i & 3) == 0) {
+                    level.sendParticles(ParticleTypes.END_ROD, p.x, p.y, p.z, 1, 0.01, 0.01, 0.01, 0.0);
+                }
+            } else {
+                level.sendParticles(ParticleTypes.ELECTRIC_SPARK, p.x, p.y, p.z, 2, 0.025, 0.025, 0.025, 0.012);
+            }
+        }
+
+        if (target == null) {
+            return;
+        }
+
+        float damage = spell == Spell.FIREBOLT ? 6.0F : spell == Spell.ICE_SPIKE ? 6.5F : 7.0F;
+        boolean hurt = target.hurtServer(level, level.damageSources().indirectMagic(player, player), damage);
+        if (hurt && spell == Spell.FIREBOLT) {
+            target.igniteForSeconds(2.0F);
+        }
+        if (hurt) {
+            spawnImpact(level, target.getBoundingBox().getCenter(),
+                spell == Spell.FIREBOLT ? Spell.FLAMES : spell == Spell.ICE_SPIKE ? Spell.FROSTBITE : Spell.SPARKS);
+        }
+    }
+
     private static void spawnWard(ServerLevel level, ServerPlayer player, Vec3 hand) {
         Vec3 look = player.getLookAngle();
         Vec3 center = hand.add(look.scale(0.75));
@@ -320,7 +381,10 @@ public final class RangedMagic {
         GREATER_HEALING(0.0F),
         LESSER_WARD(0.0F),
         OAKFLESH(0.0F),
-        CANDLELIGHT(0.0F);
+        CANDLELIGHT(0.0F),
+        FIREBOLT(0.0F),
+        ICE_SPIKE(0.0F),
+        LIGHTNING_BOLT(0.0F);
 
         final float damagePerPulse;
 
