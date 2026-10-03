@@ -54,6 +54,7 @@ public final class RangedMagic {
     public static Item FIREBOLT;
     public static Item ICE_SPIKE;
     public static Item LIGHTNING_BOLT;
+    public static Item GRAND_HEALING;
 
     private RangedMagic() {}
 
@@ -72,6 +73,7 @@ public final class RangedMagic {
         FIREBOLT = register("firebolt", Spell.FIREBOLT);
         ICE_SPIKE = register("ice_spike", Spell.ICE_SPIKE);
         LIGHTNING_BOLT = register("lightning_bolt", Spell.LIGHTNING_BOLT);
+        GRAND_HEALING = register("grand_healing", Spell.GRAND_HEALING);
 
         ServerTickEvents.END_SERVER_TICK.register(RangedMagic::idleHandEffects);
 
@@ -93,6 +95,7 @@ public final class RangedMagic {
                     player.getInventory().add(new ItemStack(FIREBOLT));
                     player.getInventory().add(new ItemStack(ICE_SPIKE));
                     player.getInventory().add(new ItemStack(LIGHTNING_BOLT));
+                    player.getInventory().add(new ItemStack(GRAND_HEALING));
                     player.sendSystemMessage(Component.literal(
                         "SkyCraft magic demo added: novice set plus Firebolt, Ice Spike and Lightning Bolt."));
                     return 1;
@@ -261,6 +264,7 @@ public final class RangedMagic {
         if (stack.is(FIREBOLT)) return Spell.FIREBOLT;
         if (stack.is(ICE_SPIKE)) return Spell.ICE_SPIKE;
         if (stack.is(LIGHTNING_BOLT)) return Spell.LIGHTNING_BOLT;
+        if (stack.is(GRAND_HEALING)) return Spell.GRAND_HEALING;
         return null;
     }
 
@@ -325,6 +329,13 @@ public final class RangedMagic {
     }
 
     private static void castCharged(ServerLevel level, ServerPlayer player, Spell spell) {
+        if (spell == Spell.GRAND_HEALING) {
+            player.heal(12.0F);
+            spawnHealing(level, player, handPosition(player), true);
+            Vec3 chest = player.position().add(0.0, player.getBbHeight() * 0.62, 0.0);
+            level.sendParticles(ParticleTypes.END_ROD, chest.x, chest.y, chest.z, 12, 0.34, 0.42, 0.34, 0.012);
+            return;
+        }
         if (spell == Spell.CLOSE_WOUNDS) {
             player.heal(8.0F);
             spawnHealing(level, player, handPosition(player), true);
@@ -365,7 +376,7 @@ public final class RangedMagic {
             level.sendParticles(ParticleTypes.CRIT, hand.x, hand.y, hand.z, 2, spread, spread, spread, 0.0);
         } else if (spell == Spell.CANDLELIGHT) {
             level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, spread, spread, spread, 0.004);
-        } else if (spell == Spell.FAST_HEALING || spell == Spell.CLOSE_WOUNDS) {
+        } else if (spell == Spell.FAST_HEALING || spell == Spell.CLOSE_WOUNDS || spell == Spell.GRAND_HEALING) {
             level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, spread, spread, spread, 0.003);
         }
     }
@@ -446,7 +457,8 @@ public final class RangedMagic {
         CANDLELIGHT(0.0F, CastStyle.CHARGED, 10),
         FIREBOLT(0.0F, CastStyle.CHARGED, 8),
         ICE_SPIKE(0.0F, CastStyle.CHARGED, 10),
-        LIGHTNING_BOLT(0.0F, CastStyle.CHARGED, 8);
+        LIGHTNING_BOLT(0.0F, CastStyle.CHARGED, 8),
+        GRAND_HEALING(0.0F, CastStyle.CHARGED, 16);
 
         final float damagePerPulse;
         final CastStyle castStyle;
