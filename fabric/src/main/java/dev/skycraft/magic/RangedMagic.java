@@ -18,6 +18,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -43,6 +45,9 @@ public final class RangedMagic {
     public static Item SPARKS;
     public static Item HEALING;
     public static Item GREATER_HEALING;
+    public static Item LESSER_WARD;
+    public static Item OAKFLESH;
+    public static Item CANDLELIGHT;
 
     private RangedMagic() {}
 
@@ -52,6 +57,9 @@ public final class RangedMagic {
         SPARKS = register("sparks", Spell.SPARKS);
         HEALING = register("healing", Spell.HEALING);
         GREATER_HEALING = register("greater_healing", Spell.GREATER_HEALING);
+        LESSER_WARD = register("lesser_ward", Spell.LESSER_WARD);
+        OAKFLESH = register("oakflesh", Spell.OAKFLESH);
+        CANDLELIGHT = register("candlelight", Spell.CANDLELIGHT);
 
         ServerTickEvents.END_SERVER_TICK.register(RangedMagic::idleHandEffects);
 
@@ -64,8 +72,11 @@ public final class RangedMagic {
                     player.getInventory().add(new ItemStack(SPARKS));
                     player.getInventory().add(new ItemStack(HEALING));
                     player.getInventory().add(new ItemStack(GREATER_HEALING));
+                    player.getInventory().add(new ItemStack(LESSER_WARD));
+                    player.getInventory().add(new ItemStack(OAKFLESH));
+                    player.getInventory().add(new ItemStack(CANDLELIGHT));
                     player.sendSystemMessage(Component.literal(
-                        "SkyCraft magic demo added: Flames, Frostbite, Sparks + Healing. Equip one and hold right-click to channel."));
+                        "SkyCraft magic demo added: Flames, Frostbite, Sparks, Healing, Greater Healing, Lesser Ward, Oakflesh + Candlelight."));
                     return 1;
                 })));
         });
@@ -123,6 +134,30 @@ public final class RangedMagic {
             return;
         }
 
+        if (spell == Spell.LESSER_WARD) {
+            // Keep a short resistance effect refreshed only while the ward is actively held.
+            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 6, 0, true, false));
+            spawnWard(level, player, from);
+            return;
+        }
+
+        if (spell == Spell.OAKFLESH) {
+            // Early Alteration equivalent: a one-minute protective skin buff.
+            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 20 * 60, 0, true, false));
+            spawnOakflesh(level, player);
+            player.stopUsingItem();
+            return;
+        }
+
+        if (spell == Spell.CANDLELIGHT) {
+            // Minecraft has no portable light orb without a block/entity; Night Vision is the
+            // closest non-destructive equivalent and the cast still gets a visible light aura.
+            player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 20 * 60, 0, true, false));
+            spawnCandlelight(level, player);
+            player.stopUsingItem();
+            return;
+        }
+
         Vec3 aim = player.getLookAngle();
         SkyrimActorEntity target = SkyCombat.findTarget(player, RANGE);
         Vec3 to = target != null
@@ -174,8 +209,14 @@ public final class RangedMagic {
                 }
             } else if (spell == Spell.SPARKS) {
                 level.sendParticles(ParticleTypes.ELECTRIC_SPARK, hand.x, hand.y, hand.z, 2, 0.08, 0.08, 0.08, 0.01);
-            } else {
+            } else if (spell == Spell.HEALING || spell == Spell.GREATER_HEALING) {
                 level.sendParticles(ParticleTypes.HEART, hand.x, hand.y, hand.z, 1, 0.08, 0.08, 0.08, 0.0);
+            } else if (spell == Spell.LESSER_WARD) {
+                level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, 0.10, 0.10, 0.10, 0.003);
+            } else if (spell == Spell.OAKFLESH) {
+                level.sendParticles(ParticleTypes.CRIT, hand.x, hand.y, hand.z, 1, 0.08, 0.08, 0.08, 0.0);
+            } else if (spell == Spell.CANDLELIGHT) {
+                level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, 0.08, 0.08, 0.08, 0.004);
             }
         }
     }
@@ -186,6 +227,9 @@ public final class RangedMagic {
         if (stack.is(SPARKS)) return Spell.SPARKS;
         if (stack.is(HEALING)) return Spell.HEALING;
         if (stack.is(GREATER_HEALING)) return Spell.GREATER_HEALING;
+        if (stack.is(LESSER_WARD)) return Spell.LESSER_WARD;
+        if (stack.is(OAKFLESH)) return Spell.OAKFLESH;
+        if (stack.is(CANDLELIGHT)) return Spell.CANDLELIGHT;
         return null;
     }
 
@@ -249,12 +293,34 @@ public final class RangedMagic {
         level.sendParticles(ParticleTypes.HEART, chest.x, chest.y, chest.z, 1, 0.18, 0.22, 0.18, 0.0);
     }
 
+    private static void spawnWard(ServerLevel level, ServerPlayer player, Vec3 hand) {
+        Vec3 look = player.getLookAngle();
+        Vec3 center = hand.add(look.scale(0.75));
+        level.sendParticles(ParticleTypes.END_ROD, center.x, center.y, center.z, 8, 0.38, 0.48, 0.10, 0.002);
+        level.sendParticles(ParticleTypes.ENCHANTED_HIT, center.x, center.y, center.z, 4, 0.30, 0.36, 0.08, 0.0);
+    }
+
+    private static void spawnOakflesh(ServerLevel level, ServerPlayer player) {
+        Vec3 center = player.position().add(0.0, player.getBbHeight() * 0.55, 0.0);
+        level.sendParticles(ParticleTypes.CRIT, center.x, center.y, center.z, 22, 0.42, 0.70, 0.42, 0.02);
+        level.sendParticles(ParticleTypes.SMOKE, center.x, center.y, center.z, 6, 0.28, 0.55, 0.28, 0.005);
+    }
+
+    private static void spawnCandlelight(ServerLevel level, ServerPlayer player) {
+        Vec3 above = player.getEyePosition().add(0.0, 0.65, 0.0);
+        level.sendParticles(ParticleTypes.END_ROD, above.x, above.y, above.z, 18, 0.20, 0.20, 0.20, 0.01);
+        level.sendParticles(ParticleTypes.FIREWORK, above.x, above.y, above.z, 8, 0.16, 0.16, 0.16, 0.01);
+    }
+
     public enum Spell {
         FLAMES(0.9F),
         FROSTBITE(0.7F),
         SPARKS(0.8F),
         HEALING(0.0F),
-        GREATER_HEALING(0.0F);
+        GREATER_HEALING(0.0F),
+        LESSER_WARD(0.0F),
+        OAKFLESH(0.0F),
+        CANDLELIGHT(0.0F);
 
         final float damagePerPulse;
 
