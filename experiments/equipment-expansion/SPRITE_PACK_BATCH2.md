@@ -37,3 +37,21 @@ weapon sprites. Do not pretend it does; use isolated placeholders only when expl
 7. Do not merge this branch into validated progression until isolated build + in-game testing passes.
 8. Armor work can begin here after weapon-family coverage is established, using the same conservative
    instance-safety policy.
+
+
+## Verified vanilla Orcish catalog
+
+Source verification pass completed for the ordinary unenchanted base-game Orcish family:
+
+| Item | Skyrim FormID |
+|---|---|
+| Dagger | 0001398E |
+| Sword | 00013991 |
+| War Axe | 0001398B |
+| Mace | 00013990 |
+| Greatsword | 0001398F |
+| Battleaxe | 0001398C |
+| Warhammer | 00013992 |
+| Bow | 0001398D |
+
+All eight corresponding sprites are present in the user-supplied batch2 archive. These IDs are for ordinary base-game records; enchanted/unique instances remain excluded by the conservative transfer policy.
