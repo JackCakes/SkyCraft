@@ -6,30 +6,30 @@
   "display": {
     "firstperson_righthand": {
       "scale": [
-        1.18,
-        1.18,
-        1.18
+        1.90,
+        1.90,
+        1.90
       ]
     },
     "firstperson_lefthand": {
       "scale": [
-        1.18,
-        1.18,
-        1.18
+        1.90,
+        1.90,
+        1.90
       ]
     },
     "thirdperson_righthand": {
       "scale": [
-        1.18,
-        1.18,
-        1.18
+        1.90,
+        1.90,
+        1.90
       ]
     },
     "thirdperson_lefthand": {
       "scale": [
-        1.18,
-        1.18,
-        1.18
+        1.90,
+        1.90,
+        1.90
       ]
     }
   }
