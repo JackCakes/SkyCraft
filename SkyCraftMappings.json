@@ -781,6 +781,46 @@
       "protectQuestItems": true,
       "ordinaryWeaponOnly": true,
       "enabled": true
+    },
+    {
+      "name": "Iron Helmet",
+      "skyrimFormId": "00012E4D",
+      "minecraftItem": "skycraft:skyrim_iron_helmet",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryArmorOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Iron Armor",
+      "skyrimFormId": "00012E49",
+      "minecraftItem": "skycraft:skyrim_iron_chestplate",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryArmorOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Iron Gauntlets",
+      "skyrimFormId": "00012E46",
+      "minecraftItem": "skycraft:skyrim_iron_gauntlets",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryArmorOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Iron Boots",
+      "skyrimFormId": "00012E4B",
+      "minecraftItem": "skycraft:skyrim_iron_boots",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryArmorOnly": true,
+      "enabled": true
     }
   ]
 }
