@@ -731,6 +731,56 @@
       "protectQuestItems": true,
       "ordinaryWeaponOnly": true,
       "enabled": true
+    },
+    {
+      "name": "Ancient Nord Sword",
+      "skyrimFormId": "0002C66F",
+      "minecraftItem": "skycraft:skyrim_draugr_sword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Ancient Nord War Axe",
+      "skyrimFormId": "0002C672",
+      "minecraftItem": "skycraft:skyrim_draugr_war_axe",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Ancient Nord Greatsword",
+      "skyrimFormId": "000236A5",
+      "minecraftItem": "skycraft:skyrim_draugr_greatsword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Ancient Nord Battleaxe",
+      "skyrimFormId": "0001CB64",
+      "minecraftItem": "skycraft:skyrim_draugr_battleaxe",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Ancient Nord Bow",
+      "skyrimFormId": "000302CA",
+      "minecraftItem": "skycraft:skyrim_draugr_bow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
     }
   ]
 }
