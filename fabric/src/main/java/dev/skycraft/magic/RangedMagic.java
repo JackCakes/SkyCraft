@@ -47,6 +47,8 @@ public final class RangedMagic {
     public static Item GREATER_HEALING;
     public static Item FAST_HEALING;
     public static Item LESSER_WARD;
+    public static Item STEADFAST_WARD;
+    public static Item CLOSE_WOUNDS;
     public static Item OAKFLESH;
     public static Item CANDLELIGHT;
     public static Item FIREBOLT;
@@ -63,6 +65,8 @@ public final class RangedMagic {
         GREATER_HEALING = register("greater_healing", Spell.GREATER_HEALING);
         FAST_HEALING = register("fast_healing", Spell.FAST_HEALING);
         LESSER_WARD = register("lesser_ward", Spell.LESSER_WARD);
+        STEADFAST_WARD = register("steadfast_ward", Spell.STEADFAST_WARD);
+        CLOSE_WOUNDS = register("close_wounds", Spell.CLOSE_WOUNDS);
         OAKFLESH = register("oakflesh", Spell.OAKFLESH);
         CANDLELIGHT = register("candlelight", Spell.CANDLELIGHT);
         FIREBOLT = register("firebolt", Spell.FIREBOLT);
@@ -82,6 +86,8 @@ public final class RangedMagic {
                     player.getInventory().add(new ItemStack(GREATER_HEALING));
                     player.getInventory().add(new ItemStack(FAST_HEALING));
                     player.getInventory().add(new ItemStack(LESSER_WARD));
+                    player.getInventory().add(new ItemStack(STEADFAST_WARD));
+                    player.getInventory().add(new ItemStack(CLOSE_WOUNDS));
                     player.getInventory().add(new ItemStack(OAKFLESH));
                     player.getInventory().add(new ItemStack(CANDLELIGHT));
                     player.getInventory().add(new ItemStack(FIREBOLT));
@@ -163,10 +169,11 @@ public final class RangedMagic {
             return;
         }
 
-        if (spell == Spell.LESSER_WARD) {
-            // Keep a short resistance effect refreshed only while the ward is actively held.
-            player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 6, 0, true, false));
-            spawnWard(level, player, from);
+        if (spell == Spell.LESSER_WARD || spell == Spell.STEADFAST_WARD) {
+            // Wards exist only while the cast is held. Steadfast Ward is the stronger Restoration tier.
+            int amplifier = spell == Spell.STEADFAST_WARD ? 1 : 0;
+            player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 6, amplifier, true, false));
+            spawnWard(level, player, from, spell == Spell.STEADFAST_WARD);
             return;
         }
 
@@ -223,7 +230,7 @@ public final class RangedMagic {
                 level.sendParticles(ParticleTypes.ELECTRIC_SPARK, hand.x, hand.y, hand.z, 2, 0.08, 0.08, 0.08, 0.01);
             } else if (spell == Spell.HEALING || spell == Spell.GREATER_HEALING) {
                 level.sendParticles(ParticleTypes.HEART, hand.x, hand.y, hand.z, 1, 0.08, 0.08, 0.08, 0.0);
-            } else if (spell == Spell.LESSER_WARD) {
+            } else if (spell == Spell.LESSER_WARD || spell == Spell.STEADFAST_WARD) {
                 level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, 0.10, 0.10, 0.10, 0.003);
             } else if (spell == Spell.OAKFLESH) {
                 level.sendParticles(ParticleTypes.CRIT, hand.x, hand.y, hand.z, 1, 0.08, 0.08, 0.08, 0.0);
@@ -247,6 +254,8 @@ public final class RangedMagic {
         if (stack.is(GREATER_HEALING)) return Spell.GREATER_HEALING;
         if (stack.is(FAST_HEALING)) return Spell.FAST_HEALING;
         if (stack.is(LESSER_WARD)) return Spell.LESSER_WARD;
+        if (stack.is(STEADFAST_WARD)) return Spell.STEADFAST_WARD;
+        if (stack.is(CLOSE_WOUNDS)) return Spell.CLOSE_WOUNDS;
         if (stack.is(OAKFLESH)) return Spell.OAKFLESH;
         if (stack.is(CANDLELIGHT)) return Spell.CANDLELIGHT;
         if (stack.is(FIREBOLT)) return Spell.FIREBOLT;
@@ -316,6 +325,13 @@ public final class RangedMagic {
     }
 
     private static void castCharged(ServerLevel level, ServerPlayer player, Spell spell) {
+        if (spell == Spell.CLOSE_WOUNDS) {
+            player.heal(8.0F);
+            spawnHealing(level, player, handPosition(player), true);
+            Vec3 chest = player.position().add(0.0, player.getBbHeight() * 0.62, 0.0);
+            level.sendParticles(ParticleTypes.END_ROD, chest.x, chest.y, chest.z, 8, 0.22, 0.30, 0.22, 0.01);
+            return;
+        }
         if (spell == Spell.FAST_HEALING) {
             player.heal(4.0F);
             spawnHealing(level, player, handPosition(player), true);
@@ -349,7 +365,7 @@ public final class RangedMagic {
             level.sendParticles(ParticleTypes.CRIT, hand.x, hand.y, hand.z, 2, spread, spread, spread, 0.0);
         } else if (spell == Spell.CANDLELIGHT) {
             level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, spread, spread, spread, 0.004);
-        } else if (spell == Spell.FAST_HEALING) {
+        } else if (spell == Spell.FAST_HEALING || spell == Spell.CLOSE_WOUNDS) {
             level.sendParticles(ParticleTypes.END_ROD, hand.x, hand.y, hand.z, 2, spread, spread, spread, 0.003);
         }
     }
@@ -391,11 +407,11 @@ public final class RangedMagic {
         }
     }
 
-    private static void spawnWard(ServerLevel level, ServerPlayer player, Vec3 hand) {
+    private static void spawnWard(ServerLevel level, ServerPlayer player, Vec3 hand, boolean steadfast) {
         Vec3 look = player.getLookAngle();
         Vec3 center = hand.add(look.scale(0.75));
-        level.sendParticles(ParticleTypes.END_ROD, center.x, center.y, center.z, 8, 0.38, 0.48, 0.10, 0.002);
-        level.sendParticles(ParticleTypes.ENCHANTED_HIT, center.x, center.y, center.z, 4, 0.30, 0.36, 0.08, 0.0);
+        level.sendParticles(ParticleTypes.END_ROD, center.x, center.y, center.z, steadfast ? 10 : 6, 0.38, 0.48, 0.10, 0.002);
+        level.sendParticles(ParticleTypes.ENCHANTED_HIT, center.x, center.y, center.z, steadfast ? 6 : 3, 0.30, 0.36, 0.08, 0.0);
     }
 
     private static void spawnOakflesh(ServerLevel level, ServerPlayer player) {
@@ -423,7 +439,9 @@ public final class RangedMagic {
         HEALING(0.0F, CastStyle.CONCENTRATION, 0),
         GREATER_HEALING(0.0F, CastStyle.CONCENTRATION, 0),
         FAST_HEALING(0.0F, CastStyle.CHARGED, 8),
+        CLOSE_WOUNDS(0.0F, CastStyle.CHARGED, 12),
         LESSER_WARD(0.0F, CastStyle.CONCENTRATION, 0),
+        STEADFAST_WARD(0.0F, CastStyle.CONCENTRATION, 0),
         OAKFLESH(0.0F, CastStyle.CHARGED, 12),
         CANDLELIGHT(0.0F, CastStyle.CHARGED, 10),
         FIREBOLT(0.0F, CastStyle.CHARGED, 8),
