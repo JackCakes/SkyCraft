@@ -821,6 +821,86 @@
       "protectQuestItems": true,
       "ordinaryArmorOnly": true,
       "enabled": true
+    },
+    {
+      "name": "Orcish Dagger",
+      "skyrimFormId": "0001398E",
+      "minecraftItem": "skycraft:skyrim_orcish_dagger",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Orcish Sword",
+      "skyrimFormId": "00013991",
+      "minecraftItem": "skycraft:skyrim_orcish_sword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Orcish War Axe",
+      "skyrimFormId": "0001398B",
+      "minecraftItem": "skycraft:skyrim_orcish_war_axe",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Orcish Mace",
+      "skyrimFormId": "00013990",
+      "minecraftItem": "skycraft:skyrim_orcish_mace",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Orcish Greatsword",
+      "skyrimFormId": "0001398F",
+      "minecraftItem": "skycraft:skyrim_orcish_greatsword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Orcish Battleaxe",
+      "skyrimFormId": "0001398C",
+      "minecraftItem": "skycraft:skyrim_orcish_battleaxe",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Orcish Warhammer",
+      "skyrimFormId": "00013992",
+      "minecraftItem": "skycraft:skyrim_orcish_warhammer",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Orcish Bow",
+      "skyrimFormId": "0001398D",
+      "minecraftItem": "skycraft:skyrim_orcish_bow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
     }
   ]
 }
