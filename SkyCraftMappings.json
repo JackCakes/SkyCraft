@@ -901,6 +901,86 @@
       "protectQuestItems": true,
       "ordinaryWeaponOnly": true,
       "enabled": true
+    },
+    {
+      "name": "Glass Dagger",
+      "skyrimFormId": "000139A6",
+      "minecraftItem": "skycraft:skyrim_glass_dagger",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Glass Sword",
+      "skyrimFormId": "000139A9",
+      "minecraftItem": "skycraft:skyrim_glass_sword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Glass War Axe",
+      "skyrimFormId": "000139A3",
+      "minecraftItem": "skycraft:skyrim_glass_war_axe",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Glass Mace",
+      "skyrimFormId": "000139A8",
+      "minecraftItem": "skycraft:skyrim_glass_mace",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Glass Greatsword",
+      "skyrimFormId": "000139A7",
+      "minecraftItem": "skycraft:skyrim_glass_greatsword",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Glass Battleaxe",
+      "skyrimFormId": "000139A4",
+      "minecraftItem": "skycraft:skyrim_glass_battleaxe",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Glass Warhammer",
+      "skyrimFormId": "000139AA",
+      "minecraftItem": "skycraft:skyrim_glass_warhammer",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
+    },
+    {
+      "name": "Glass Bow",
+      "skyrimFormId": "000139A5",
+      "minecraftItem": "skycraft:skyrim_glass_bow",
+      "skyrimCount": 1,
+      "minecraftCount": 1,
+      "protectQuestItems": true,
+      "ordinaryWeaponOnly": true,
+      "enabled": true
     }
   ]
 }
