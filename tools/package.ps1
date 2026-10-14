@@ -105,7 +105,7 @@ New-ZipFromFolder "$dist\SkyCraft-Minecraft.zip" $bundle
 Remove-Item -Recurse -Force $bundle
 
 New-Zip "$dist\SkyCraft-$version.zip" ([ordered]@{
-    "README-MO2-Adventure.txt" = "$root\\README-MO2-Adventure.txt"
+    "README-MO2-Adventure.txt" = "$root\README-MO2-Adventure.txt"
     "SKSE/Plugins/SkyCraft.dll" = $dll
     "SKSE/Plugins/SkyCraft.ini" = "$root\skse\SkyCraft.ini"
     "SKSE/Plugins/SkyCraftMappings.json" = "$root\SkyCraftMappings.json"
