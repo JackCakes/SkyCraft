@@ -1,0 +1,503 @@
+# Builds SkyCraft on GitHub's Windows machines and uploads the Vortex/MO2 mod zip.
+#
+# Put this file in your repo as .github/workflows/build.yml. If SkyCraft-Patch.patch is in the root of the repo (control mode is already
+# in the source; the patch adds world reset, show world, mobs, mob roaming, chat input, mob life, mob combat, mob polish and mob hit
+# effects, no mobs in settlements, block collision for Skyrim mode (section models of merged boxes, real crates as the fallback), and Minecraft's mobs as lock-on targets), it is
+# applied before building, and skipped if the source already has it.
+#
+# Block collision in Skyrim's own control mode is real: every section of Minecraft's blocks is written as a small collision-only model of
+# merged boxes (BlockCollision.cpp) and loaded as an invisible static, so the player, NPCs and projectiles all meet the blocks. If that
+# can't work on an install, invisible crates on the blocks around you (BlockCrates.cpp) hold the player up instead.
+#
+# A second job ("tdm-patch") builds True Directional Movement from its own source with TrueDirectionalMovement-VirtualTargets.patch (also
+# in the root of the repo) applied, and uploads it as its own zip: TrueDirectionalMovement.dll for SKSE\\Plugins, to be installed over TDM's,
+# the way TDM's Improved Camera patch is. SkyCraft needs THAT dll to lock on to Minecraft's mobs: it hands them over as TDM's virtual
+# targets. Without it SkyCraft still works, but there is no lock-on to mobs (SkyCraft.log says so). If the patch isn't in the repo the
+# job does nothing.
+# Run it from the repo's Actions tab ("Build SkyCraft" -> Run workflow), or it runs on every push.
+#
+# The first run takes a long time (vcpkg compiles the C++ dependencies, Gradle fetches Minecraft);
+# later runs reuse caches and are much faster.
+
+name: Build SkyCraft
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [integration/sunp22-adventure]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # The project's CMake preset needs the "Visual Studio 18 2026" generator. windows-2025 has had
+    # Visual Studio 2026 since June 2026. If a future image drops it, try windows-2025-vs2026.
+    runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\.vcpkg-cache
+      VCPKG_DISABLE_METRICS: "1"
+
+    steps:
+      # Before checkout, so files keep the line endings they have in the repo.
+      - name: Keep line endings as they are in the repo
+        run: git config --global core.autocrlf false
+
+      - name: Check out the source (with the CommonLibSSE-NG submodule, if the repo has it)
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Merge Sunp22 enhancements with JackCakes ranged magic (non-destructive)
+        shell: bash
+        run: |
+          if ! grep -q 'LockOn::Install' skse/src/main.cpp; then
+            git config user.name 'SkyCraft Integration Bot'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git apply --check --exclude=README.md '--exclude=docs/*' SkyCraft-Patch.patch
+            git apply --exclude=README.md '--exclude=docs/*' SkyCraft-Patch.patch
+            git add -A
+            git commit -m 'Apply pinned Sunp22 gameplay patch to shared SkyCraft base'
+            git fetch origin experimental/ranged-magic
+            git merge --no-ff --no-edit -X ours -m 'Merge JackCakes ranged magic and progression with Sunp22 features' origin/experimental/ranged-magic
+            python - <<'PY'
+            from pathlib import Path
+            import re, subprocess
+            j=Path("fabric/src/main/java/dev/skycraft/link/Proto.java")
+            h=Path("protocol/skycraft_protocol.h")
+            ib=Path("fabric/src/client/java/dev/skycraft/client/InputBridge.java")
+            main=Path("skse/src/main.cpp")
+            jc=j.read_text()
+            hc=h.read_text()
+            def include(text,anchor,item):
+                if item not in text:
+                    assert anchor in text, "Missing anchor: " + anchor
+                    return text.replace(anchor,item+"\n"+anchor,1)
+                return text
+            # Sunp's inputs 9-11 and events 6-12 overlap JackCakes' input 9 / event 6.
+            # Give custom resource bridge its own numbers on both sides, keep all Sunp's.
+            jc=re.sub(r'(public static final int VERSION = )\d+',r'\g<1>17',jc)
+            hc=re.sub(r'(kVersion = )\d+',r'\g<1>17',hc)
+            jc=re.sub(r'(IN_RESOURCE_TRANSFER = )\d+',r'\g<1>12',jc)
+            jc=re.sub(r'(EV_RESOURCE_TRANSFER_ACK = )\d+',r'\g<1>13',jc)
+            hc=re.sub(r'(kInResourceTransfer = )\d+',r'\g<1>12',hc)
+            hc=re.sub(r'(kEvResourceTransferAck = )\d+',r'\g<1>13',hc)
+            jc=include(jc,"\tpublic static final int HURT_MELEE = 0;","\tpublic static final int IN_RESOURCE_TRANSFER = 12;")
+            jc=include(jc,"\t// Skyrim skills (ActorValue) Minecraft reports use of;","\tpublic static final int EV_RESOURCE_TRANSFER_ACK = 13;")
+            if "kInResourceTransfer" not in hc:
+                hc=hc.replace("kInOpenMenu = 8,", "kInResourceTransfer = 12,  // JackCakes resource bridge\n\t\tkInOpenMenu = 8,",1)
+            if "kEvResourceTransferAck" not in hc:
+                pos=hc.index("kEvNpcStance = 7")
+                end=hc.index("\n\t};",pos)
+                hc=hc[:end]+"\n\t\tkEvResourceTransferAck = 13,  // JackCakes resource bridge"+hc[end:]
+            assert "kInResourceTransfer = 12" in hc and "IN_RESOURCE_TRANSFER = 12" in jc
+            assert "kEvResourceTransferAck = 13" in hc and "EV_RESOURCE_TRANSFER_ACK = 13" in jc
+            assert "kVersion = 17" in hc and "VERSION = 17" in jc
+            j.write_text(jc)
+            h.write_text(hc)
+            s=ib.read_text()
+            original=subprocess.check_output(["git","show","origin/experimental/ranged-magic:fabric/src/client/java/dev/skycraft/client/InputBridge.java"],text=True)
+            s=include(s,"import dev.skycraft.link.SkyLink;","import dev.skycraft.progression.ResourceBridge;")
+            s=include(s,"\t\t\tcase Proto.IN_OPEN_MENU -> {","\t\t\tcase Proto.IN_RESOURCE_TRANSFER -> transferResource(minecraft, a, b, c);")
+            if "private static void transferResource" not in s:
+                begin=original.index("\t/** Skyrim acquired a mapped item.")
+                end=original.index("\tprivate static void key(",begin)
+                s=include(s,"\tprivate static void key(",original[begin:end].rstrip("\n"))
+            assert "case Proto.IN_RESET_WORLD" in s and "case Proto.IN_RESOURCE_TRANSFER" in s
+            assert "private static void transferResource" in s
+            ib.write_text(s)
+            m=main.read_text()
+            m=include(m,'#include "Game.h"','#include "ResourceBridge.h"')
+            m=include(m,"\t\t\tskycraft::CrashLog::Install();","\t\t\tskycraft::ResourceBridge::Install();")
+            m=include(m,"\t\t\tskycraft::Game::OnGameLoaded();","\t\t\tskycraft::ResourceBridge::OnGameLoaded();")
+            assert "skycraft::LockOn::Install()" in m
+            main.write_text(m)
+            # Don't conceal source-level loss of either feature.
+            assert Path("fabric/src/main/java/dev/skycraft/magic/RangedMagic.java").exists()
+            assert Path("skse/src/ResourceBridge.cpp").exists()
+            assert Path("fabric/src/main/java/dev/skycraft/combat/SkyrimSpawner.java").exists()
+            assert Path("skse/src/BlockCollision.cpp").exists()
+            print("Source merge and protocol namespace checks passed")
+            PY
+            git add -A
+            git commit -m 'Resolve SkyCraft shared-memory protocol collisions for integration'
+            git diff --check HEAD~1 HEAD
+          else
+            echo 'Sunp22 gameplay source is already present; no rebuild merge required.'
+          fi
+
+      - name: Apply SkyCraft-Patch.patch (world reset, mobs, real-crate block collision, mob lock-on) if it is in the repo
+        shell: bash
+        run: |
+          # The docs aren't part of the build, so a change upstream there must not stop it.
+          opts=(--exclude=README.md '--exclude=docs/*')
+          # A patch whose setting name is already in the source has been applied (or committed): skip
+          # it. (Checking by reversing the patch doesn't work once a later patch has changed the same lines.)
+          apply_patch() {
+            local patch=$1 marker=$2 file=$3
+            if [ ! -f "$patch" ]; then
+              echo "No $patch in the repo; skipping it."
+            elif grep -q "$marker" "$file"; then
+              echo "The source already has what $patch adds; nothing to apply."
+            elif git apply "${opts[@]}" --check "$patch"; then
+              git apply "${opts[@]}" "$patch"
+              echo "Applied $patch."
+            else
+              echo "::error::$patch doesn't apply to this source. The repo has probably changed since the patch was made."
+              exit 1
+            fi
+          }
+          apply_patch SkyCraft-Patch.patch LockOn::Install skse/src/main.cpp
+
+      # Open doors, trapdoors and fence gates have no collision in Skyrim (SkyCraft-Patch.patch already has this; the edit is repeated here
+      # because a source that already has an earlier SkyCraft-Patch.patch committed skips the patch above, and would never get it).
+      # Does nothing when the source already has it.
+      - name: Make sure open doors have no collision in Skyrim
+        shell: bash
+        run: |
+          py=python3; command -v python3 >/dev/null 2>&1 || py=python
+          "$py" - <<'PYEOF'
+          import re, sys
+          p = "fabric/src/client/java/dev/skycraft/client/render/WorldExporter.java"
+          s = open(p, encoding="utf-8", newline="").read()
+          if "isOpenNow" in s:
+              print("Open doors already have no collision; nothing to do.")
+              sys.exit(0)
+          nl = "\r\n" if "\r\n" in s else "\n"
+          s = s.replace("\r\n", "\n")
+          a = "\tprivate static boolean isOpenable(BlockState state) {\n\t\treturn state.hasProperty(BlockStateProperties.OPEN);\n\t}\n"
+          b = "\t\t\t\t\t\tvar collision = state.getCollisionShape(level, pos);\n"
+          c = "\t\t\t\tif (now != o.state[i]) {\n\t\t\t\t\to.state[i] = now;"
+          for part in (a, b, c):
+              if s.count(part) != 1:
+                  print("::error::WorldExporter.java is not what the door edit expects; not applied.")
+                  sys.exit(1)
+          s = s.replace(a, a + "\n\t/** A door, trapdoor or fence gate that is open: Skyrim gets no collision for it at all (Minecraft still has its thin panel). */\n\tprivate static boolean isOpenNow(BlockState state) {\n\t\treturn state.hasProperty(BlockStateProperties.OPEN) && state.getValue(BlockStateProperties.OPEN);\n\t}\n", 1)
+          s = s.replace(b, "\t\t\t\t\t\tvar collision = isOpenNow(state) ? net.minecraft.world.phys.shapes.Shapes.empty() : state.getCollisionShape(level, pos);\n", 1)
+          s = s.replace(c, "\t\t\t\tif (now != o.state[i]) {\n\t\t\t\t\tSkyCraft.LOG.info(\"SkyCraft: {} at {} is now {}; its section goes to Skyrim again\", now.getBlock().getDescriptionId(), o.pos[i], isOpenNow(now) ? \"open (no collision in Skyrim)\" : \"closed\");\n\t\t\t\t\to.state[i] = now;", 1)
+          open(p, "w", encoding="utf-8", newline="").write(s.replace("\n", nl))
+          m = "skse/src/main.cpp"
+          t = open(m, encoding="utf-8", newline="").read()
+          if "patch revision 39 (" not in t:
+              t = t.replace("patch revision 38 (", "patch revision 39 (open doors, trapdoors and fence gates have no collision in Skyrim; each open/close is logged on the Minecraft side; revision 38: ", 1)
+              open(m, "w", encoding="utf-8", newline="").write(t)
+          print("Open doors now have no collision in Skyrim.")
+          PYEOF
+
+      # A section whose solids and shapes are the same as last time is not sent as collision again, so Skyrim does not rebuild its collision model
+      # (the sections beside a door were re-sent and rebuilt many times a second, which kept the door's own section waiting). SkyCraft-Patch.patch
+      # already has this; it is repeated here for a source that has an earlier SkyCraft-Patch.patch committed. Does nothing when the source has it.
+      - name: Make sure unchanged sections are not rebuilt in Skyrim
+        shell: bash
+        run: |
+          py=python3; command -v python3 >/dev/null 2>&1 || py=python
+          "$py" - <<'PYEOF'
+          import sys
+          p = "fabric/src/client/java/dev/skycraft/client/render/WorldExporter.java"
+          s = open(p, encoding="utf-8", newline="").read()
+          m = "skse/src/main.cpp"
+          t = open(m, encoding="utf-8", newline="").read()
+          if "patch revision 40 (" not in t:
+              t = t.replace("patch revision 39 (", "patch revision 40 (a section sent again with the same collision no longer makes Skyrim rebuild its collision model, so the sections beside a door stop being rebuilt many times a second and a door change shows at once; revision 39: ", 1)
+              open(m, "w", encoding="utf-8", newline="").write(t)
+          if "COLLISION_HASH" in s:
+              print("Unchanged sections are already not re-sent as collision; nothing to do.")
+              sys.exit(0)
+          nl = "\r\n" if "\r\n" in s else "\n"
+          s = s.replace("\r\n", "\n")
+          reps = [
+              ('\tprivate static final long[] SOLID_BITS = new long[64];',
+               '\t// What the solids and shapes of each section were when last sent: a section sent again with the same collision does not make Skyrim rebuild its collision model.\n\tprivate static final it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap COLLISION_HASH = new it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap();\n\tprivate static final long[] SOLID_BITS = new long[64];'),
+              ('\t\tSOLID.clear();\n\t\tSHAPE.clear();',
+               '\t\tSOLID.clear();\n\t\tSHAPE.clear();\n\t\tCOLLISION_HASH.clear();'),
+              ('\t\t\tif (solidCount > 0 || SOLID.contains(key)) {\n\t\t\t\tByteBuffer solidHeader',
+               '\t\t\tlong collisionHash = 0xCBF29CE484222325L ^ solidCount ^ ((long) shapeCount << 20);\n\t\t\tfor (long word : SOLID_BITS) {\n\t\t\t\tcollisionHash = (collisionHash ^ word) * 0x100000001B3L;\n\t\t\t\tcollisionHash ^= collisionHash >>> 29;\n\t\t\t}\n\t\t\tbyte[] shapeBytes = SHAPES.array();\n\t\t\tfor (int i = 0, n = SHAPES.position(); i < n; i++) {\n\t\t\t\tcollisionHash = (collisionHash ^ shapeBytes[i]) * 0x100000001B3L;\n\t\t\t}\n\t\t\tboolean collisionSame = COLLISION_HASH.containsKey(key) && COLLISION_HASH.get(key) == collisionHash\n\t\t\t\t&& (solidCount > 0) == SOLID.contains(key) && (shapeCount > 0) == SHAPE.contains(key);\n\t\t\tboolean collisionSent = true;\n\t\t\tif (!collisionSame && (solidCount > 0 || SOLID.contains(key))) {\n\t\t\t\tByteBuffer solidHeader'),
+              ('\t\t\t\tif (!SkyLink.writeRender(Proto.REN_SOLIDS, solidHeader, bits.flip())) {\n\t\t\t\t\tmarkDirty(sx, sy, sz);',
+               '\t\t\t\tif (!SkyLink.writeRender(Proto.REN_SOLIDS, solidHeader, bits.flip())) {\n\t\t\t\t\tcollisionSent = false;\n\t\t\t\t\tmarkDirty(sx, sy, sz);'),
+              ('\t\t\tif (shapeCount > 0 || SHAPE.contains(key)) {\n\t\t\t\tByteBuffer shapeHeader',
+               '\t\t\tif (!collisionSame && (shapeCount > 0 || SHAPE.contains(key))) {\n\t\t\t\tByteBuffer shapeHeader'),
+              ('\t\t\t\tif (!SkyLink.writeRender(Proto.REN_SHAPES, shapeHeader, SHAPES.flip())) {\n\t\t\t\t\tmarkDirty(sx, sy, sz);',
+               '\t\t\t\tif (!SkyLink.writeRender(Proto.REN_SHAPES, shapeHeader, SHAPES.flip())) {\n\t\t\t\t\tcollisionSent = false;\n\t\t\t\t\tmarkDirty(sx, sy, sz);'),
+              ("\t\t\t// Cells dug out of Skyrim's world: its geometry there goes.",
+               "\t\t\tif (collisionSent && !collisionSame) {\n\t\t\t\tCOLLISION_HASH.put(key, collisionHash);\n\t\t\t}\n\t\t\t// Cells dug out of Skyrim's world: its geometry there goes."),
+          ]
+          for a, b in reps:
+              if s.count(a) != 1:
+                  print("::error::WorldExporter.java is not what the collision de-duplication edit expects; not applied.")
+                  sys.exit(1)
+          for a, b in reps:
+              s = s.replace(a, b, 1)
+          open(p, "w", encoding="utf-8", newline="").write(s.replace("\n", nl))
+          print("A section with unchanged collision is no longer sent to Skyrim again.")
+          PYEOF
+
+      # A repo made from "Download ZIP" has no submodule contents. Fetch CommonLibSSE-NG ourselves
+      # then (the branch's latest commit, not the exact one the author built with).
+      - name: Make sure CommonLibSSE-NG is there
+        shell: bash
+        run: |
+          dir=skse/extern/CommonLibSSE-NG
+          if [ -f "$dir/CMakeLists.txt" ]; then
+            echo "CommonLibSSE-NG came with the checkout."
+          else
+            echo "CommonLibSSE-NG is missing; cloning the ng branch."
+            rm -rf "$dir"
+            git clone --recursive --branch ng https://github.com/alandtse/CommonLibVR.git "$dir"
+          fi
+
+      - name: Set up JDK 25 (Minecraft 26.x needs it)
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Create the vcpkg cache folder
+        run: New-Item -ItemType Directory -Force "$env:VCPKG_DEFAULT_BINARY_CACHE" | Out-Null
+
+      - name: Restore the vcpkg cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('skse/vcpkg.json', 'skse/CMakePresets.json') }}-${{ github.run_id }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-${{ hashFiles('skse/vcpkg.json', 'skse/CMakePresets.json') }}-
+            vcpkg-${{ runner.os }}-
+
+      - name: Restore the Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('fabric/gradle.properties', 'fabric/build.gradle', 'fabric/settings.gradle', 'fabric/gradle/wrapper/gradle-wrapper.properties') }}-${{ github.run_id }}
+          restore-keys: |
+            gradle-${{ runner.os }}-${{ hashFiles('fabric/gradle.properties', 'fabric/build.gradle', 'fabric/settings.gradle', 'fabric/gradle/wrapper/gradle-wrapper.properties') }}-
+            gradle-${{ runner.os }}-
+
+      # The CMake preset looks for vcpkg in .tools/vcpkg (the README's "Building from source").
+      # Bootstrapping downloads vcpkg.exe from GitHub's releases, which now and then answers 502 for a
+      # minute or two. Both network steps are retried, waiting a little longer each time.
+      - name: Get vcpkg
+        run: |
+          function Retry([string]$what, [scriptblock]$action) {
+            for ($i = 1; $i -le 5; $i++) {
+              & $action
+              if ($LASTEXITCODE -eq 0) { return }
+              Write-Host "$what failed (attempt $i of 5)."
+              if ($i -lt 5) { Start-Sleep -Seconds (20 * $i) }
+            }
+            throw "$what failed 5 times"
+          }
+          Retry "Cloning vcpkg" {
+            if (Test-Path .tools\vcpkg) { Remove-Item -Recurse -Force .tools\vcpkg }
+            git clone https://github.com/microsoft/vcpkg .tools\vcpkg
+          }
+          Retry "Bootstrapping vcpkg" {
+            .tools\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+          }
+
+      # Done here as well as inside package.ps1, which hides CMake's configure output: if a
+      # dependency fails to build, the reason is in this step's log.
+      - name: Configure the SKSE plugin (vcpkg builds its dependencies here)
+        working-directory: skse
+        run: |
+          cmake --preset default
+          if ($LASTEXITCODE) { throw "CMake couldn't configure the SKSE plugin" }
+
+      # Builds both halves and packs dist\ exactly as the author's release does.
+      - name: Build and package
+        run: |
+          powershell -ExecutionPolicy Bypass -File tools\package.ps1
+          if ($LASTEXITCODE) { throw "tools\package.ps1 failed" }
+
+      - name: Check the controls switch and world reset made it into the build
+        shell: bash
+        run: |
+          if [ -f SkyCraft-Patch.patch ] || grep -q sToggleKey skse/src/Input.cpp; then
+            grep -aq sToggleKey skse/build/RelWithDebInfo/SkyCraft.dll \
+              && echo "SkyCraft.dll has the controls switch." \
+              || { echo "::error::SkyCraft.dll was built without the controls switch."; exit 1; }
+          fi
+          if [ -f SkyCraft-Patch.patch ] || grep -q sResetKey skse/src/Input.cpp; then
+            grep -aq sResetKey skse/build/RelWithDebInfo/SkyCraft.dll \
+              && echo "SkyCraft.dll has the world reset key." \
+              || { echo "::error::SkyCraft.dll was built without the world reset key."; exit 1; }
+          fi
+          if [ -f SkyCraft-Patch.patch ] || grep -q ApplyMobHit skse/src/Combat.cpp; then
+            grep -aq "a Minecraft mob hit" skse/build/RelWithDebInfo/SkyCraft.dll \
+              && echo "SkyCraft.dll has the mob-hit handling." \
+              || { echo "::error::SkyCraft.dll was built without the mob-hit handling."; exit 1; }
+          fi
+
+      - name: Check the mob combat made it into the build
+        shell: bash
+        run: |
+          if [ -f SkyCraft-Patch.patch ] || grep -q kInSkyrimSwing skse/src/Combat.cpp; then
+            grep -aq "Skyrim swing (kind" skse/build/RelWithDebInfo/SkyCraft.dll \
+              && echo "SkyCraft.dll has the Skyrim-mode attacks." \
+              || { echo "::error::SkyCraft.dll was built without the Skyrim-mode attacks."; exit 1; }
+          fi
+
+      - name: Check the mob hit effects and settlement check made it into the build
+        shell: bash
+        run: |
+          if [ -f SkyCraft-Patch.patch ] || grep -q PlayMobImpact skse/src/Combat.cpp; then
+            grep -aq "a place people live" skse/build/RelWithDebInfo/SkyCraft.dll \
+              && echo "SkyCraft.dll has the settlement check." \
+              || { echo "::error::SkyCraft.dll was built without the settlement check."; exit 1; }
+          fi
+
+      - name: Check the block collision and mob lock-on made it into the build
+        shell: bash
+        run: |
+          if [ -f SkyCraft-Patch.patch ] || grep -q LockOn::Install skse/src/main.cpp; then
+            grep -aq "Block crates:" skse/build/RelWithDebInfo/SkyCraft.dll \
+              && echo "SkyCraft.dll has the real-crate block collision." \
+              || { echo "::error::SkyCraft.dll was built without the real-crate block collision."; exit 1; }
+            grep -aq "lock-on: " skse/build/RelWithDebInfo/SkyCraft.dll \
+              && echo "SkyCraft.dll has the mob lock-on." \
+              || { echo "::error::SkyCraft.dll was built without the mob lock-on."; exit 1; }
+            # The old simulated collision (a box holding the player up by hand) must be gone.
+            if grep -aq "Skyrim control: Minecraft block collision" skse/build/RelWithDebInfo/SkyCraft.dll; then
+              echo "::error::SkyCraft.dll still has the simulated block collision (is an old SkyCraft-Patch.patch in the repo?)."; exit 1
+            fi
+            grep -aqE "patch revision (2[4-9]|[3-9][0-9])" skse/build/RelWithDebInfo/SkyCraft.dll \
+              && echo "SkyCraft.dll is patch revision 24 or newer." \
+              || { echo "::error::SkyCraft.dll was built without patch revision 24 or newer (is the newest SkyCraft-Patch.patch in the repo?)."; exit 1; }
+            grep -aq "Block collision: on" skse/build/RelWithDebInfo/SkyCraft.dll \
+              && echo "SkyCraft.dll has the block collision models." \
+              || { echo "::error::SkyCraft.dll was built without the block collision models."; exit 1; }
+          fi
+
+      - name: Upload the mod
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkyCraft-for-Vortex
+          path: |
+            dist/SkyCraft-*.zip
+            dist/skycraft-fabric-*.jar
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish verified integration branch
+        shell: bash
+        run: |
+          if [ "$(git branch --show-current)" = "integration/sunp22-adventure" ]; then
+            git push origin HEAD:integration/sunp22-adventure
+          fi
+
+  # True Directional Movement with virtual targets (see TrueDirectionalMovement-VirtualTargets.patch). Built from TDM's own
+  # source, the way TDM's own workflow does it, and packed as a small mod that goes over TDM's DLL.
+  tdm-patch:
+    runs-on: windows-2022  # TDM's preset uses the "Visual Studio 17 2022" generator
+    timeout-minutes: 90
+    env:
+      # TDM's source, and the revision of it the patch is made for. If TDM changes and the patch stops applying, put the
+      # commit the patch was made for here (the job says so when it can't apply it).
+      TDM_REPO: ersh1/TrueDirectionalMovement
+      TDM_REF: master
+      VCPKG_COMMIT_ID: cd61e1e26a038e82d6550a3ebbe0fbbfe7da78e3  # the one TDM's own workflow uses
+
+    steps:
+      - name: Keep line endings as they are
+        run: git config --global core.autocrlf false
+
+      - name: Check out SkyCraft (for the patch)
+        uses: actions/checkout@v5
+        with:
+          path: skycraft
+
+      - name: Look for TrueDirectionalMovement-VirtualTargets.patch
+        id: have
+        shell: bash
+        run: |
+          if [ -f skycraft/TrueDirectionalMovement-VirtualTargets.patch ]; then
+            echo "have=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have=false" >> "$GITHUB_OUTPUT"
+            echo "No TrueDirectionalMovement-VirtualTargets.patch in the repo; nothing to build."
+          fi
+
+      - name: Check out True Directional Movement (with its CommonLibSSE-NG submodule)
+        if: steps.have.outputs.have == 'true'
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.TDM_REPO }}
+          ref: ${{ env.TDM_REF }}
+          path: tdm
+          submodules: recursive
+
+      - name: Apply the virtual targets patch
+        if: steps.have.outputs.have == 'true'
+        shell: bash
+        working-directory: tdm
+        run: |
+          patch=../skycraft/TrueDirectionalMovement-VirtualTargets.patch
+          if grep -q SetVirtualTargets src/DirectionalMovementHandler.cpp; then
+            echo "TDM's source already has virtual targets; nothing to apply."
+          elif git apply --check "$patch"; then
+            git apply "$patch"
+            echo "Applied the patch to TDM $(git rev-parse --short HEAD)."
+          else
+            echo "::error::TrueDirectionalMovement-VirtualTargets.patch doesn't apply to TDM $(git rev-parse --short HEAD). TDM has probably changed since the patch was made; set TDM_REF in the workflow to the commit it was made for, or have the patch redone."
+            exit 1
+          fi
+
+      - name: Set up vcpkg (installs no packages itself)
+        if: steps.have.outputs.have == 'true'
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: ${{ runner.workspace }}/b/vcpkg
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          vcpkgJsonGlob: tdm/vcpkg.json
+
+      # TDM's preset turns every warning into an error (/WX); here they stay warnings, so a harmless one can't stop the build.
+      - name: Configure True Directional Movement
+        if: steps.have.outputs.have == 'true'
+        working-directory: tdm
+        shell: pwsh
+        run: |
+          cmake --preset github-actions "-DCMAKE_CXX_FLAGS=/EHsc /MP /W4"
+          if ($LASTEXITCODE) { throw "CMake couldn't configure True Directional Movement" }
+
+      - name: Build True Directional Movement
+        if: steps.have.outputs.have == 'true'
+        working-directory: tdm
+        shell: pwsh
+        run: |
+          cmake --build build --config Release
+          if ($LASTEXITCODE) { throw "True Directional Movement didn't build" }
+
+      - name: Pack the mod
+        if: steps.have.outputs.have == 'true'
+        shell: pwsh
+        run: |
+          $dll = "tdm\build\src\Release\TrueDirectionalMovement.dll"
+          if (-not (Test-Path $dll)) { throw "$dll wasn't built" }
+          $stage = "tdm-pack"
+          New-Item -ItemType Directory -Force "$stage\SKSE\Plugins" | Out-Null
+          Copy-Item $dll "$stage\SKSE\Plugins\TrueDirectionalMovement.dll"
+          Copy-Item tdm\COPYING "$stage\COPYING"
+          Copy-Item tdm\EXCEPTIONS "$stage\EXCEPTIONS"
+          Copy-Item skycraft\TrueDirectionalMovement-VirtualTargets.patch "$stage\TrueDirectionalMovement-VirtualTargets.patch"
+          @"
+          True Directional Movement with virtual targets (for SkyCraft)
+
+          Install over True Directional Movement (it needs TDM's other files); this DLL replaces TDM's.
+          It is TDM $(git -C tdm rev-parse --short HEAD) with TrueDirectionalMovement-VirtualTargets.patch applied, which lets a mod hand
+          TDM things to lock on to that aren't actors (SkyCraft hands it Minecraft's mobs). Nothing else changes.
+          True Directional Movement is by Ersh, GPL-3.0 with its modding exception (COPYING, EXCEPTIONS). The source is
+          https://github.com/ersh1/TrueDirectionalMovement plus the patch included here.
+          "@ | Set-Content "$stage\README.txt"
+          New-Item -ItemType Directory -Force dist-tdm | Out-Null
+          Compress-Archive -Path "$stage\*" -DestinationPath "dist-tdm\SkyCraft-TDM-VirtualTargets-patch.zip"
+
+      - name: Upload the patch mod
+        if: steps.have.outputs.have == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkyCraft-TDM-VirtualTargets-patch
+          path: dist-tdm/SkyCraft-TDM-VirtualTargets-patch.zip
+          if-no-files-found: error
+          retention-days: 30
