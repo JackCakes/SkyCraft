@@ -67,6 +67,9 @@ public final class ResourceBridge {
 			// Respect registered stack size; custom equipment is unstackable.
 			int chunk = Math.min(remaining, Math.max(1, item.getDefaultMaxStackSize()));
 			ItemStack stack = new ItemStack(item, chunk);
+			if (chunk == 1 && dev.skycraft.weapon.WeaponAffixes.isEligible(stack)) {
+				dev.skycraft.weapon.WeaponAffixes.roll(stack, player.getRandom());
+			}
 			player.getInventory().add(stack);
 			int overflow = stack.getCount();
 			accepted += chunk - overflow;

@@ -1,0 +1,158 @@
+# Weapon Affix / Bonus Experiment
+
+Branch: `experimental/weapon-affixes`
+
+This branch is intentionally based on the current weapon-bridge experiment and is not merged into
+progression/stable work.
+
+## Goal
+
+Make two otherwise identical Skyrim weapons feel like separate loot drops after they become Minecraft
+items. The first prototype uses one Terraria-style prefix per converted weapon.
+
+A fresh SkyCraft weapon has a configurable 70% chance to receive one weighted affix. The selected
+affix is stored on that exact Minecraft ItemStack in `minecraft:custom_data`, so it persists through
+normal Minecraft saves/inventory moves and syncs to multiplayer clients.
+
+## First prototype affixes
+
+| Affix | Effect |
+| --- | --- |
+| Brutal | +25% attack damage |
+| Swift | +30% attack speed |
+| Long | +0.50 entity reach |
+| Sturdy | +50% max durability |
+| Volatile | 10% chance on each hit to deal 3x final damage |
+| Deadly | +15% damage and +15% speed |
+| Flurried | -10% damage, +50% speed; dagger/sword only |
+| Berserker | +40% damage, -20% speed, +10% durability; greatsword/battleaxe only |
+| Giant | +20% damage, -10% speed, +0.75 reach; greatsword/battleaxe only |
+| Forceful | +5% damage, +0.85 attack knockback; sword/greatsword/battleaxe |
+| Veteran | +20% damage, +10% speed, +15% durability; only loot from level 20+ Skyrim actors |
+
+Static effects are per-stack Minecraft attribute/data-component overrides. Volatile is evaluated when
+damage reaches SkyCraft's Skyrim actor stand-in, after Minecraft has already applied normal weapon
+damage/cooldown/crit logic, then the resulting damage is forwarded to Skyrim.
+
+## Editable config
+
+On first run the Fabric side writes:
+
+`config/skycraft-weapon-affixes.json`
+
+The whole table is data-driven: roll chance, weights, numeric effects and an `allowedWeapons`
+pool can be edited. `["*"]` means every SkyCraft weapon; otherwise list registry paths such as
+`skyrim_iron_dagger` or `skyrim_iron_battleaxe`. Use
+`/skyaffixes reload` to reload the table for future drops; existing weapons keep the affix and
+numbers already baked into their ItemStack.
+
+## Testing without waiting on Skyrim pickup conversion
+
+`/skyaffixes testkit`
+
+adds 12 independently rolled SkyCraft Iron Swords. This is only a development command. Inspect names,
+lore, attack speed/reach/damage, and durability.
+
+For deterministic testing, use:
+
+`/skyaffixes give brutal`
+`/skyaffixes give swift`
+`/skyaffixes give long`
+`/skyaffixes give sturdy`
+`/skyaffixes give volatile`
+
+Hold an affixed weapon and run `/skyaffixes inspect` to print the exact stored values. With a Volatile
+weapon, enough hits should eventually make the log show:
+
+`SkyCraft affix proc: 3.0x damage on <actor>`
+
+## Safety / scope
+
+- Every weapon is rolled exactly once. A failed affix roll is also marked, so a normal weapon cannot later reroll itself into a bonus.
+- Runtime proc numbers are copied into the weapon's own custom data when it rolls. Editing/reloading the config changes future drops only; existing Volatile/etc. weapons keep the behavior they originally rolled.
+- No ESP/ESL, Papyrus state, Skyrim save records or SKSE co-save data are added.
+- One affix per weapon for prototype 1.
+- No life-steal, status effects, elemental procs, rarity tiers or multi-affix combinations yet.
+- Affixes are server authoritative because the Minecraft server creates the ItemStack and rolls procs.
+- If the weapon bridge is not yet user-validated, this branch can still validate the Minecraft-side
+  affix mechanics independently with the test command.
+
+
+## Balancing helper
+
+Hold any SkyCraft weapon and run `/skyaffixes chances`. It prints that weapon family's current
+effective probability for no affix and for every eligible prefix after applying both the global
+`rollChance` and the weighted per-weapon pool. This makes balancing the JSON table possible without
+doing hundreds of manual drops.
+
+
+## Skyrim loot provenance
+
+The experimental transfer now also carries Skyrim's `oldContainer` FormID for ordinary weapon
+pickups. Because SkyCraft's existing input event has only a 16-bit `code` field, provenance uses a
+new protocol-v14 metadata event keyed by the 32-bit transfer request id, followed by the unchanged
+resource-transfer event. Multiplayer then forwards the same full FormID in the resource-transfer
+packet for guests. The raw source FormID is stored on the rolled Minecraft weapon and is visible in
+`/skyaffixes inspect` when nonzero. This provenance marker is kept even when that weapon's one-time
+roll produces no affix, so later source-aware loot rules do not lose where the item came from.
+
+This does not change affix odds yet. It is groundwork for later rules such as boss/chief loot having
+better affix pools or a weapon remembering which Skyrim actor/container it came from. Console-created
+or world-source weapons may legitimately have source 00000000.
+
+
+## Knockback modifiers
+
+Affixes can now set `knockbackAdd`. This is applied through Minecraft's normal
+`ATTACK_KNOCKBACK` attribute, so SkyCraft's existing proxy-entity combat path captures the stronger
+Minecraft shove and forwards that knockback strength/direction into Skyrim along with the hit. It does
+not need a second custom Skyrim damage implementation.
+
+
+## Stable source identity for future loot rules
+
+For actor/corpse loot the provenance metadata now includes three independent values:
+
+- source reference FormID — the exact corpse/container instance,
+- source base FormID — the actor/container base record, useful for stable NPC-type rules,
+- source actor level — 0 for non-actor containers.
+
+These are stored on the Minecraft weapon whether or not it rolled an affix. This lets a later balance
+layer distinguish, for example, a generic low-level bandit weapon from loot taken from a particular
+boss/base NPC without trying to reconstruct that information after Skyrim has already removed the
+source item.
+
+
+## Source-aware affix pools
+
+Affix JSON entries can now restrict themselves by loot origin:
+
+- `minSourceLevel` / `maxSourceLevel` gate an affix by the Skyrim actor level that owned the item.
+  A max of 0 means no upper limit.
+- `allowedSourceBaseFormIds` is `["*"]` by default. Replace it with one or more hexadecimal Skyrim
+  base FormIDs to make a prefix exclusive to particular NPC/base records.
+
+The default **Veteran** prefix is the first source-aware example: it enters the weighted pool only
+when the weapon came from a level-20-or-higher Skyrim actor. Console-created weapons and chest/world
+loot have source level 0 and therefore cannot roll Veteran.
+
+
+## Data-driven affix rarity
+
+Each prefix now has a `rarity` field: `common`, `uncommon`, `rare`, `epic`, or
+`legendary`. Rarity is presentation metadata rather than a hidden power multiplier: it changes the
+prefix color on the actual weapon name and is stored on that weapon at roll time. This lets balance
+stay explicit in the numeric fields while still making exceptional drops immediately recognizable.
+The default Volatile prefix is Epic; Berserker, Giant and Veteran are Rare.
+
+
+## Source-level simulation
+
+For testing source-aware pools without hunting for a particular Skyrim NPC, use:
+
+`/skyaffixes simulate <level>`
+
+It creates 16 Iron Swords and rolls them as though they came from a Skyrim actor of that level.
+For example, `/skyaffixes simulate 19` cannot roll the default Veteran prefix, while
+`/skyaffixes simulate 20` can. This is development-only test tooling and does not change normal
+loot provenance.

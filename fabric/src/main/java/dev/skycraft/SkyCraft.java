@@ -27,6 +27,8 @@ public final class SkyCraft implements ModInitializer {
 		dev.skycraft.world.SkyTime.init();
 		dev.skycraft.combat.SkyrimSpawner.init();
 		dev.skycraft.weapon.SkyrimWeapons.init();
+		dev.skycraft.weapon.WeaponAffixes.init();
+		dev.skycraft.landon.LandonItems.init();
 		dev.skycraft.magic.RangedMagic.init();
 		dev.skycraft.armor.SkyrimArmor.init();
 		ServerLifecycleEvents.SERVER_STARTED.register(SkyCraft::configureServer);
