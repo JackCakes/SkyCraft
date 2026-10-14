@@ -202,6 +202,8 @@ public final class SkyLink {
 		public int teleportSeq;
 		public int viewportW, viewportH;
 		public float gameHour;
+		/** The Skyrim player's health, 0..1. */
+		public float healthFrac;
 
 		public boolean inGame() {
 			return (this.flags & SKY_IN_GAME) != 0;
@@ -213,6 +215,16 @@ public final class SkyLink {
 
 		public boolean loading() {
 			return (this.flags & SKY_LOADING) != 0;
+		}
+
+		/** The player chose Skyrim's own controls: Minecraft gets no input and its player follows Skyrim's. */
+		public boolean skyrimControl() {
+			return (this.flags & SKY_SKYRIM_CONTROL) != 0;
+		}
+
+		/** The player is somewhere people live (a city, town, village, farm, inn, house, castle...). */
+		public boolean inSettlement() {
+			return (this.flags & SKY_SETTLEMENT) != 0;
 		}
 	}
 
@@ -283,6 +295,7 @@ public final class SkyLink {
 			out.viewportW = s.get(JAVA_INT, b + SS_VIEWPORT_W);
 			out.viewportH = s.get(JAVA_INT, b + SS_VIEWPORT_H);
 			out.gameHour = s.get(JAVA_FLOAT, b + SS_GAME_HOUR);
+			out.healthFrac = s.get(JAVA_FLOAT, b + SS_HEALTH);
 			VarHandle.loadLoadFence();
 			int seq2 = (int) INT.getAcquire(s, b + SS_SEQ);
 			if (seq1 == seq2) {
@@ -465,6 +478,17 @@ public final class SkyLink {
 	/** Queues an event for Skyrim. Safe from any thread. Drops the event if Skyrim is a full ring behind. */
 	public static void pushEvent(int type, int formId, float a, float b, float c, float d, int flags) {
 		pushEvent(type, formId, a, b, c, d, flags, 0);
+	}
+
+	/** How many more events fit in the ring right now (0 when not linked). Lets low-value, repeated events back off before the ring fills. */
+	public static synchronized int eventRingFree() {
+		MemorySegment s = shm;
+		if (s == null) {
+			return 0;
+		}
+		long head = s.get(JAVA_LONG, OFF_EVENT_RING + ER_HEAD);
+		long tail = (long) LONG.getAcquire(s, OFF_EVENT_RING + ER_TAIL);
+		return (int) Math.max(0L, EVENT_RING_ENTRIES - (head - tail));
 	}
 
 	public static synchronized void pushEvent(int type, int formId, float a, float b, float c, float d, int flags, int weapon) {
