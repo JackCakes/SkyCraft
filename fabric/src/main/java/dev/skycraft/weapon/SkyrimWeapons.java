@@ -68,6 +68,27 @@ public final class SkyrimWeapons {
         DEFAULTS.put("skyrim_elven_battleaxe", new Stats(13.5, 0.9, 3.0, 525));
         DEFAULTS.put("skyrim_elven_warhammer", new Stats(14.5, 0.8, 3.1, 550));
         DEFAULTS.put("skyrim_elven_bow", new Stats(6.5, 1.2, 4.0, 400));
+        DEFAULTS.put("skyrim_orcish_dagger", new Stats(6.0, 2.0, 1.8, 325));
+        DEFAULTS.put("skyrim_orcish_sword", new Stats(8.0, 1.6, 2.5, 375));
+        DEFAULTS.put("skyrim_orcish_war_axe", new Stats(9.0, 1.3, 2.4, 400));
+        DEFAULTS.put("skyrim_orcish_mace", new Stats(10.0, 1.1, 2.3, 425));
+        DEFAULTS.put("skyrim_orcish_greatsword", new Stats(13.0, 1.0, 3.0, 525));
+        DEFAULTS.put("skyrim_orcish_battleaxe", new Stats(14.0, 0.9, 3.0, 575));
+        DEFAULTS.put("skyrim_orcish_warhammer", new Stats(15.0, 0.8, 3.1, 600));
+        DEFAULTS.put("skyrim_orcish_bow", new Stats(7.0, 1.2, 4.0, 450));
+        DEFAULTS.put("skyrim_glass_dagger", new Stats(6.5, 2.0, 1.8, 375));
+        DEFAULTS.put("skyrim_glass_sword", new Stats(8.5, 1.6, 2.5, 425));
+        DEFAULTS.put("skyrim_glass_war_axe", new Stats(9.5, 1.3, 2.4, 450));
+        DEFAULTS.put("skyrim_glass_mace", new Stats(10.5, 1.1, 2.3, 475));
+        DEFAULTS.put("skyrim_glass_greatsword", new Stats(13.5, 1.0, 3.0, 575));
+        DEFAULTS.put("skyrim_glass_battleaxe", new Stats(14.5, 0.9, 3.0, 625));
+        DEFAULTS.put("skyrim_glass_warhammer", new Stats(15.5, 0.8, 3.1, 650));
+        DEFAULTS.put("skyrim_glass_bow", new Stats(7.5, 1.2, 4.0, 500));
+        DEFAULTS.put("skyrim_draugr_sword", new Stats(6.0, 1.6, 2.7, 200));
+        DEFAULTS.put("skyrim_draugr_war_axe", new Stats(7.0, 1.3, 2.6, 225));
+        DEFAULTS.put("skyrim_draugr_greatsword", new Stats(11.0, 1.0, 3.4, 350));
+        DEFAULTS.put("skyrim_draugr_battleaxe", new Stats(12.0, 0.9, 3.5, 400));
+        DEFAULTS.put("skyrim_draugr_bow", new Stats(5.5, 1.2, 4.5, 250));
     }
 
     private SkyrimWeapons() {}

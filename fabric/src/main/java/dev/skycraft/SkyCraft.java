@@ -28,6 +28,7 @@ public final class SkyCraft implements ModInitializer {
 		dev.skycraft.combat.SkyrimSpawner.init();
 		dev.skycraft.weapon.SkyrimWeapons.init();
 		dev.skycraft.magic.RangedMagic.init();
+		dev.skycraft.armor.SkyrimArmor.init();
 		ServerLifecycleEvents.SERVER_STARTED.register(SkyCraft::configureServer);
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			giveStarterKit(handler.getPlayer());
