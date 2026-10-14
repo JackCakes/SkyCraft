@@ -47,3 +47,5 @@ DEBUG
 Skyrim SKSE log: Documents/My Games/Skyrim Special Edition/SKSE/SkyCraft.log
 Minecraft client: %LOCALAPPDATA%/SkyCraft/Prism/instances/SkyCraft/.minecraft/logs/latest.log
 Source: https://github.com/JackCakes/SkyCraft/tree/integration/sunp22-adventure
+
+Build workflow: https://github.com/JackCakes/SkyCraft/actions/workflows/build-adventure-mo2.yml
