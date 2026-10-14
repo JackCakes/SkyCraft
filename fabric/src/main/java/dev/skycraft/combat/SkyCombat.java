@@ -93,6 +93,12 @@ public final class SkyCombat {
 				SkyCraft.LOG.info("SkyCraft: hit {} for {} (knockback {})", proxy.getName().getString(), hit[0], hit[3]);
 			}
 		}
+		if (level.getGameTime() % 4 == 0) {
+			NpcFightsBack.tick(level, PROXIES.values());
+		}
+		if (level.getGameTime() % 2 == 0) {
+			MobProxies.tick(level, PROXIES.values(), players);
+		}
 	}
 
 	private static void sync(ServerLevel level) {
@@ -117,6 +123,7 @@ public final class SkyCombat {
 				proxy = new SkyrimActorEntity(SKYRIM_ACTOR, level);
 				proxy.setFormId(a.formId());
 				proxy.setSize(a.width(), a.height());
+				proxy.setSkyFlags(a.flags());
 				proxy.snapTo(a.x(), a.y(), a.z(), a.yaw(), 0.0F);
 				if (!a.name().isEmpty()) {
 					proxy.setCustomName(Component.literal(a.name()));
@@ -128,6 +135,7 @@ public final class SkyCombat {
 				continue;
 			}
 			proxy.setSize(a.width(), a.height());
+			proxy.setSkyFlags(a.flags());
 			proxy.setPos(a.x(), a.y(), a.z());
 			proxy.setYRot(a.yaw());
 			proxy.setYHeadRot(a.yaw());
@@ -246,7 +254,6 @@ public final class SkyCombat {
 				0.0F, 0);
 		}
 	}
-
 
 	/**
 	 * Finds the closest mirrored Skyrim actor intersected by the player's look ray.

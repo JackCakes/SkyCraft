@@ -1,9 +1,10 @@
 package dev.skycraft.client;
 
 import dev.skycraft.combat.SkyCombat;
+import dev.skycraft.combat.SkyrimSwings;
 import dev.skycraft.link.Proto;
-import dev.skycraft.link.SkyLink;
 import dev.skycraft.progression.ResourceBridge;
+import dev.skycraft.link.SkyLink;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.server.level.ServerPlayer;
@@ -64,6 +65,9 @@ public final class InputBridge {
 			}
 			case Proto.IN_RELEASE_ALL -> releaseAll();
 			case Proto.IN_HURT -> hurt(minecraft, code, a / 100.0F, b, c);
+			case Proto.IN_RESET_WORLD -> MirrorWorld.requestReset(minecraft);
+			case Proto.IN_SWING -> swing(minecraft, code, a, b, c);
+			case Proto.IN_PROXY_HURT -> proxyHurt(minecraft, a, b, (code & Proto.PROXY_HURT_BY_PLAYER) != 0);
 			case Proto.IN_RESOURCE_TRANSFER -> transferResource(minecraft, a, b, c);
 			case Proto.IN_OPEN_MENU -> {
 				if (minecraft.gui.screen() == null && minecraft.player != null) {
@@ -98,6 +102,40 @@ public final class InputBridge {
 		});
 	}
 
+	/**
+	 * Skyrim's player swung or shot in Skyrim's own controls: the mobs in front of them take the hit on
+	 * the integrated server (see SkyrimSwings). A guest's Skyrim isn't in the host's world, so it has no say.
+	 */
+	private static void swing(Minecraft minecraft, int code, int damage100, int yaw100, int pitch100) {
+		var server = minecraft.getSingleplayerServer();
+		if (server == null || minecraft.player == null) {
+			return;
+		}
+		int kind = code & 0xFF;
+		float charge = ((code >> 8) & 0xFF) / 100.0F;
+		var uuid = minecraft.player.getUUID();
+		server.execute(() -> {
+			ServerPlayer player = server.getPlayerList().getPlayer(uuid);
+			if (player != null) {
+				SkyrimSwings.swing(player, kind, damage100 / 100.0F, yaw100 / 100.0F, pitch100 / 100.0F, charge);
+			}
+		});
+	}
+
+	/** Skyrim's NPCs hurt a mob's stand-in: the mob itself takes it (see MobProxies). */
+	private static void proxyHurt(Minecraft minecraft, int damage100, int mobId, boolean byPlayer) {
+		var server = minecraft.getSingleplayerServer();
+		if (server == null || minecraft.player == null) {
+			return;
+		}
+		var uuid = minecraft.player.getUUID();
+		server.execute(() -> {
+			ServerPlayer player = server.getPlayerList().getPlayer(uuid);
+			if (player != null) {
+				SkyrimSwings.proxyHurt(player, mobId, damage100 / 100.0F, byPlayer);
+			}
+		});
+	}
 
 	/** Skyrim acquired a mapped item. Grant it on the authoritative Minecraft server. */
 	private static void transferResource(Minecraft minecraft, int requestId, int count, int itemHash) {
