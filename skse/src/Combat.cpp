@@ -1,4 +1,5 @@
 #include "Game.h"
+#include "ResourceBridge.h"
 
 namespace skycraft
 {
@@ -857,6 +858,9 @@ namespace skycraft
 				// Still drain Minecraft's events so stale hits don't land when control resumes.
 				proto::McEvent ev;
 				while (link.PopEvent(ev)) {
+					if (ResourceBridge::HandleEvent(ev)) {
+						continue;
+					}
 					if (ev.type == proto::kEvPlayerDied && link.McAlive()) {
 						KillPlayer(a_player, ev);
 					}
@@ -878,6 +882,9 @@ namespace skycraft
 
 			proto::McEvent ev;
 			while (link.PopEvent(ev)) {
+				if (ResourceBridge::HandleEvent(ev)) {
+					continue;
+				}
 				switch (ev.type) {
 				case proto::kEvHitActor:
 					ApplyHit(a_player, ev);
