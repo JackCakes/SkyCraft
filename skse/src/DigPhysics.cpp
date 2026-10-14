@@ -2,6 +2,8 @@
 #include "Game.h"
 #include "Perf.h"
 
+#include <SimpleIni.h>
+
 // Skyrim's NPCs in a dug-up world. Every actor moves with a Havok character proxy: it collects
 // contact points with the world (bhkCharacterPointCollector), turns them into surface planes, and
 // solves its movement against those planes. Two hooks:
@@ -15,6 +17,14 @@
 // may add up to userPlanes planes. Skyrim's own surface planes (0x140BA04D0): the contact normal,
 // distance minus keepDistance (+0xA8), the proxy's frictions, and a push out of penetration at
 // penetrationRecoverySpeed (+0xDC).
+namespace skycraft
+{
+	namespace BlockCrates
+	{
+		RE::FormID BaseForm();  // BlockCrates.cpp
+	}
+}
+
 namespace skycraft::Dig
 {
 	namespace
@@ -66,6 +76,9 @@ namespace skycraft::Dig
 		std::atomic<int> loggedDropped{ 0 };
 		std::atomic<int> loggedPlanes{ 0 };
 		std::atomic<const RE::hkpCollidable*> puppet{ nullptr };
+		// The player's proxy in Skyrim's own control mode. Minecraft's blocks are real crates there (BlockCrates.cpp), so Havok's own contacts
+		// are all the player gets: no planes of ours, no holding it up by hand.
+		std::atomic<const RE::hkpCollidable*> skyPlayer{ nullptr };
 		std::atomic<float>                    puppetFeet{ 0.0f };
 		constexpr float                       kFeetSlack = 0.3f;  // Havok units above the feet still "under" them
 
@@ -145,62 +158,68 @@ namespace skycraft::Dig
 			if ((x1 - x0 + 1) * (y1 - y0 + 1) * (z1 - z0 + 1) > 512) {
 				return;  // something huge (a dragon): not worth it
 			}
-			for (int by = y0; by <= y1; ++by) {
+			for (int by = y0 - 1; by <= y1; ++by) {  // a fence reaches up from the block below
 				for (int bz = z0; bz <= z1; ++bz) {
 					for (int bx = x0; bx <= x1; ++bx) {
 						if (!NpcBlocks::SolidAt(bx, by, bz)) {
 							continue;
 						}
-						// The block in Havok space.
-						const float bxl = bx / k, bxh = (bx + 1) / k;
-						const float byl = -(bz + 1) / k, byh = -bz / k;
-						const float bzl = by / k, bzh = (by + 1) / k;
-						float d[3];
-						d[0] = cx - std::clamp(cx, bxl, bxh);
-						d[1] = cy - std::clamp(cy, byl, byh);
-						d[2] = zTop < bzl ? zTop - bzl : (zBot > bzh ? zBot - bzh : 0.0f);
-						// Faces shared with another solid block are inside the wall: no edge
-						// planes at the seams, or walking over a block floor would snag.
-						if (d[0] > 0 && NpcBlocks::SolidAt(bx + 1, by, bz)) d[0] = 0;
-						if (d[0] < 0 && NpcBlocks::SolidAt(bx - 1, by, bz)) d[0] = 0;
-						if (d[1] > 0 && NpcBlocks::SolidAt(bx, by, bz - 1)) d[1] = 0;
-						if (d[1] < 0 && NpcBlocks::SolidAt(bx, by, bz + 1)) d[1] = 0;
-						if (d[2] > 0 && NpcBlocks::SolidAt(bx, by + 1, bz)) d[2] = 0;
-						if (d[2] < 0 && NpcBlocks::SolidAt(bx, by - 1, bz)) d[2] = 0;
-						const float len = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-						Plane plane;
-						if (len > 1e-5f) {
-							plane = { { d[0] / len, d[1] / len, d[2] / len }, len - r };
-						} else {
-							// The capsule's core is inside the block: out through the top if the feet
-							// are near it, else the nearest side.
-							const float up = bzh - (zBot - r);
-							const float side[4] = { cx - bxl, bxh - cx, cy - byl, byh - cy };
-							const float nearest = std::min({ side[0], side[1], side[2], side[3] });
-							if (up <= nearest + 0.25f || (!NpcBlocks::SolidAt(bx, by + 1, bz) && up < 0.6f)) {
-								plane = { { 0, 0, 1 }, -up };
-							} else if (nearest == side[0]) {
-								plane = { { -1, 0, 0 }, -(side[0] + r) };
-							} else if (nearest == side[1]) {
-								plane = { { 1, 0, 0 }, -(side[1] + r) };
-							} else if (nearest == side[2]) {
-								plane = { { 0, -1, 0 }, -(side[2] + r) };
+						NpcBlocks::BlockBox boxes[NpcBlocks::kMaxBoxes];
+						const int           boxCount = NpcBlocks::BoxesAt(bx, by, bz, boxes);
+						for (int bi = 0; bi < boxCount; ++bi) {
+							const auto& bb = boxes[bi];
+							// The box in Havok space.
+							const NpcBlocks::BlockBox ab{ { bx + bb.lo[0], by + bb.lo[1], bz + bb.lo[2] }, { bx + bb.hi[0], by + bb.hi[1], bz + bb.hi[2] } };
+							const float bxl = ab.lo[0] / k, bxh = ab.hi[0] / k;
+							const float byl = -ab.hi[2] / k, byh = -ab.lo[2] / k;
+							const float bzl = ab.lo[1] / k, bzh = ab.hi[1] / k;
+							float d[3];
+							d[0] = cx - std::clamp(cx, bxl, bxh);
+							d[1] = cy - std::clamp(cy, byl, byh);
+							d[2] = zTop < bzl ? zTop - bzl : (zBot > bzh ? zBot - bzh : 0.0f);
+							// Faces shared with another solid block are inside the wall: no edge
+							// planes at the seams, or walking over a block floor would snag.
+							if (d[0] > 0 && NpcBlocks::FaceCovered(ab, 0, 1)) d[0] = 0;
+							if (d[0] < 0 && NpcBlocks::FaceCovered(ab, 0, -1)) d[0] = 0;
+							if (d[1] > 0 && NpcBlocks::FaceCovered(ab, 2, -1)) d[1] = 0;
+							if (d[1] < 0 && NpcBlocks::FaceCovered(ab, 2, 1)) d[1] = 0;
+							if (d[2] > 0 && NpcBlocks::FaceCovered(ab, 1, 1)) d[2] = 0;
+							if (d[2] < 0 && NpcBlocks::FaceCovered(ab, 1, -1)) d[2] = 0;
+							const float len = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+							Plane plane;
+							if (len > 1e-5f) {
+								plane = { { d[0] / len, d[1] / len, d[2] / len }, len - r };
 							} else {
-								plane = { { 0, 1, 0 }, -(side[3] + r) };
+								// The capsule's core is inside the block: out through the top if the feet
+								// are near it, else the nearest side.
+								const float up = bzh - (zBot - r);
+								const float side[4] = { cx - bxl, bxh - cx, cy - byl, byh - cy };
+								const float nearest = std::min({ side[0], side[1], side[2], side[3] });
+								if (up <= nearest + 0.25f || (!NpcBlocks::FaceCovered(ab, 1, 1) && up < 0.6f)) {
+									plane = { { 0, 0, 1 }, -up };
+								} else if (nearest == side[0]) {
+									plane = { { -1, 0, 0 }, -(side[0] + r) };
+								} else if (nearest == side[1]) {
+									plane = { { 1, 0, 0 }, -(side[1] + r) };
+								} else if (nearest == side[2]) {
+									plane = { { 0, -1, 0 }, -(side[2] + r) };
+								} else {
+									plane = { { 0, 1, 0 }, -(side[3] + r) };
+								}
 							}
-						}
-						if (plane.d > kPlaneReach) {
-							continue;
-						}
-						bool duplicate = false;
-						for (const auto& other : a_out) {
-							if (std::fabs(other.d - plane.d) < 1e-3f && other.n[0] * plane.n[0] + other.n[1] * plane.n[1] + other.n[2] * plane.n[2] > 0.9999f) {
-								duplicate = true;
-								break;
+							if (plane.d > kPlaneReach) {
+								continue;
 							}
-						}
-						if (!duplicate) {
-							a_out.push_back(plane);
+							bool duplicate = false;
+							for (const auto& other : a_out) {
+								if (std::fabs(other.d - plane.d) < 1e-3f && other.n[0] * plane.n[0] + other.n[1] * plane.n[1] + other.n[2] * plane.n[2] > 0.9999f) {
+									duplicate = true;
+									break;
+								}
+							}
+							if (!duplicate) {
+								a_out.push_back(plane);
+							}
 						}
 					}
 				}
@@ -232,11 +251,15 @@ namespace skycraft::Dig
 				}
 				RE::hkAabb box;
 				shape->GetAabbImpl(phantom->motionState.transform, 0.0f, box);
+				// The player in Skyrim's own control mode stands on real crates (BlockCrates.cpp): Havok's contacts with them are all it gets.
+				if (&phantom->collidable == skyPlayer.load(std::memory_order_relaxed)) {
+					return;
+				}
 				static thread_local std::vector<Plane> planes;
 				planes.clear();
 				BlockPlanes(box, planes);
 				if (&phantom->collidable == puppet.load(std::memory_order_relaxed)) {
-					// The player's body: only the blocks it stands on (Minecraft does the rest).
+					// The player's body while Minecraft drives it: only the blocks it stands on (Minecraft's own collision does the rest).
 					std::erase_if(planes, [](const Plane& a_plane) { return a_plane.n[2] < 0.7f; });
 				}
 				if (planes.empty()) {
@@ -300,6 +323,11 @@ namespace skycraft::Dig
 	{
 		puppetFeet.store(a_feetHavokZ, std::memory_order_relaxed);
 		puppet.store(a_proxy, std::memory_order_relaxed);
+	}
+
+	void SetSkyrimPlayer(const RE::hkpCollidable* a_proxy)
+	{
+		skyPlayer.store(a_proxy, std::memory_order_relaxed);
 	}
 
 	void Install()

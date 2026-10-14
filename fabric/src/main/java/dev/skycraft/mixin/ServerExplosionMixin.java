@@ -71,6 +71,11 @@ public abstract class ServerExplosionMixin {
 		}
 		ServerExplosion self = (ServerExplosion) (Object) this;
 		var center = self.center();
-		SkyLink.pushEvent(Proto.EV_EXPLOSION, 0, (float) center.x, (float) center.y, (float) center.z, self.radius(), 0);
+		// flags bit 0: a creeper's blast, which Skyrim's people are spared (Combat.cpp)
+		// (A creeper is still in the world, at the blast's centre, while its explosion runs: it is removed right after.)
+		net.minecraft.world.phys.AABB atCentre = new net.minecraft.world.phys.AABB(center, center).inflate(1.5);
+		boolean creeper = !self.level().getEntitiesOfClass(net.minecraft.world.entity.Entity.class, atCentre,
+			entity -> "creeper".equals(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).getPath())).isEmpty();
+		SkyLink.pushEvent(Proto.EV_EXPLOSION, 0, (float) center.x, (float) center.y, (float) center.z, self.radius(), creeper ? 1 : 0);
 	}
 }

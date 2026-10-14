@@ -8,7 +8,7 @@ public final class Proto {
 	}
 
 	public static final int MAGIC = 0x43594B53;
-	public static final int VERSION = 11;
+	public static final int VERSION = 17;
 	// A second client on the same PC (multiplayer testing) talks to its own stand-in Skyrim:
 	// -Dskycraft.link=Local\SkyCraft_guest (see tools/fake_guest.py).
 	public static final String MAPPING_NAME = System.getProperty("skycraft.link", "Local\\SkyCraft_v1");
@@ -40,6 +40,18 @@ public final class Proto {
 	// Input types added in v5
 	public static final int IN_HURT = 7;
 	public static final int IN_OPEN_MENU = 8;
+	public static final int IN_RESET_WORLD = 9;
+	// Skyrim's player swung or shot in Skyrim's own controls: code = SWING_* | (charge % << 8), a = Skyrim damage * 100,
+	// b = yaw * 100, c = pitch * 100 (Minecraft's angles).
+	public static final int IN_SWING = 10;
+	// Skyrim hurt a mob's stand-in: a = Skyrim damage * 100, b = the mob's entity id; code bit 0 = the player did it (a spell, a Skyrim
+	// weapon), otherwise an NPC fighting it.
+	public static final int IN_PROXY_HURT = 11;
+	public static final int PROXY_HURT_BY_PLAYER = 1;
+	public static final int SWING_MELEE = 1;
+	public static final int SWING_POWER = 2;
+	public static final int SWING_ARROW = 3;
+	public static final int IN_RESOURCE_TRANSFER = 12;
 	public static final int HURT_MELEE = 0;
 	public static final int HURT_PROJECTILE = 1;
 	public static final int HURT_MAGIC = 2;
@@ -57,6 +69,13 @@ public final class Proto {
 	public static final int ACTOR_DEAD = 1 << 1;
 	public static final int ACTOR_ESSENTIAL = 1 << 2;
 	public static final int ACTOR_IN_COMBAT = 1 << 3;
+	public static final int ACTOR_FIGHTER = 1 << 4;
+	public static final int ACTOR_BOW = 1 << 5;
+	public static final int ACTOR_WEAPON_DRAWN = 1 << 6;
+	/** A person (human, elf, orc...), not an animal or creature. */
+	public static final int ACTOR_PERSON = 1 << 7;
+	/** Bits 8 to 15 of the actor flags: Skyrim's damage for the weapon in the actor's hand (0 to 255). */
+	public static final int ACTOR_DAMAGE_SHIFT = 8;
 
 	// Event ring (relative to OFF_EVENT_RING)
 	public static final int EVENT_RING_ENTRIES = 512;
@@ -69,6 +88,25 @@ public final class Proto {
 	public static final int EV_EXPLOSION = 3;
 	public static final int EV_ARROW_STUCK = 4;
 	public static final int EV_SKILL_USE = 5;
+	// A Skyrim NPC swings at a Minecraft mob: formId, a/b/c = the mob's position (MC coords).
+	public static final int EV_NPC_SWING = 6;
+	// A Skyrim NPC readies for a fight with Minecraft mobs (d = 1: weapon out, facing a/b/c) or stands down (d = 0: weapon away).
+	public static final int EV_NPC_STANCE = 7;
+	// A mob near NPCs or near the player: formId = its entity id, a/b/c = position, d = yaw; flags = MOB_PROXY_* bits.
+	public static final int EV_MOB_PROXY = 8;
+	public static final int MOB_PROXY_GONE = 1;
+	/** The stand-in is only there to be locked on to and hit by the player: Skyrim's NPCs are not sent against it. */
+	public static final int MOB_PROXY_TARGET_ONLY = 2;
+	// The name of a mob that has a stand-in: formId = its entity id; 24 ASCII bytes in a, b, c, d, flags, weapon.
+	public static final int EV_MOB_NAME = 9;
+	// Skyrim control mode: a mob hurt the riding Minecraft player (a = damage, b/c = push, formId = mob id + 1); Skyrim hurts its player.
+	public static final int EV_PLAYER_HURT = 10;
+	// Skyrim control mode has just begun: a = Minecraft's player health 0..1, which Skyrim's player takes over.
+	public static final int EV_PLAYER_HEALTH = 11;
+	// The live state of a mob that has a stand-in: formId = its entity id, a = health, b = max health, c = eye height (blocks),
+	// d = the body's width in blocks (the height comes with EV_MOB_PROXY), flags / weapon = velocity x / z in blocks per second (float bits).
+	public static final int EV_MOB_VITALS = 12;
+	public static final int EV_RESOURCE_TRANSFER_ACK = 13;
 	// Skyrim skills (ActorValue) Minecraft reports use of; weapon skills come from EV_HIT_ACTOR.
 	public static final int SKILL_BLOCK = 9;
 	public static final int SKILL_SMITHING = 10;
@@ -78,6 +116,8 @@ public final class Proto {
 	public static final int HIT_PROJECTILE = 1 << 1;
 	public static final int HIT_SWEEP = 1 << 2;
 	public static final int HIT_FIRE = 1 << 3;
+	/** A Minecraft mob did it, not the player: no one is the attacker in Skyrim. */
+	public static final int HIT_FROM_MOB = 1 << 4;
 	public static final int WEAPON_UNARMED = 0;
 	public static final int WEAPON_BLADE = 1;
 	public static final int WEAPON_AXE = 2;
@@ -100,6 +140,8 @@ public final class Proto {
 	public static final int WE_BLOCK = 4;
 	public static final int WE_CRACK = 5;
 	public static final int WE_SHADOW = 6;
+	public static final int WE_MOB = 7;
+	public static final int MOB_NAME_BYTES = 32;
 
 	// Render ring (relative to OFF_RENDER_RING)
 	public static final long RR_HEAD = 0x00;
@@ -118,6 +160,7 @@ public final class Proto {
 	public static final int REN_RAGDOLL = 9;
 	public static final int REN_SOLIDS = 10;
 	public static final int REN_DUG = 11;
+	public static final int REN_SHAPES = 12;
 	public static final int PART_HEAD = 1, PART_BODY = 2, PART_RIGHT_ARM = 3, PART_LEFT_ARM = 4, PART_RIGHT_LEG = 5, PART_LEFT_LEG = 6;
 	public static final int LIGHT_STEADY = 0, LIGHT_FLAME = 1, LIGHT_LAVA = 2;
 	public static final int REN_VERTEX_BYTES = 32;
@@ -144,10 +187,14 @@ public final class Proto {
 	public static final long SS_VIEWPORT_W = 0x34;
 	public static final long SS_VIEWPORT_H = 0x38;
 	public static final long SS_GAME_HOUR = 0x3C;
+	public static final long SS_HEALTH = 0x40;
 
 	public static final int SKY_IN_GAME = 1;
 	public static final int SKY_MENU_OPEN = 1 << 1;
 	public static final int SKY_LOADING = 1 << 2;
+	public static final int SKY_SKYRIM_CONTROL = 1 << 3;
+	/** The player is in a town, city, village, farm, inn or other place people live: no mobs spawn there. */
+	public static final int SKY_SETTLEMENT = 1 << 4;
 
 	// McState (relative to OFF_MC_STATE)
 	public static final long MS_SEQ = 0x00;
@@ -189,6 +236,7 @@ public final class Proto {
 	public static final int MC_DEAD = 1 << 5;
 	public static final int MC_SWIMMING = 1 << 6;
 	public static final int MC_FLYING = 1 << 7;
+	public static final int MC_RESETTING = 1 << 8;
 
 	// Overlay
 	public static final long OC_STATE = 0x00;

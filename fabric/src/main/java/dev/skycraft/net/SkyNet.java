@@ -2,6 +2,7 @@ package dev.skycraft.net;
 
 import dev.skycraft.SkyCraft;
 import dev.skycraft.combat.SkyCombat;
+import dev.skycraft.progression.ResourceBridge;
 import dev.skycraft.world.SkyDig;
 import java.util.List;
 import net.minecraft.core.BlockPos;
@@ -51,6 +52,39 @@ public final class SkyNet {
 		}
 	}
 
+
+	/** Guest -> host: convert a mapped Skyrim item into this guest's real Minecraft inventory. */
+	public record ResourceTransfer(int requestId, int itemHash, int count) implements CustomPacketPayload {
+		public static final Type<ResourceTransfer> TYPE = new Type<>(Identifier.fromNamespaceAndPath(SkyCraft.MOD_ID, "resource_transfer"));
+		public static final StreamCodec<RegistryFriendlyByteBuf, ResourceTransfer> CODEC = StreamCodec.composite(
+			ByteBufCodecs.INT, ResourceTransfer::requestId,
+			ByteBufCodecs.INT, ResourceTransfer::itemHash,
+			ByteBufCodecs.VAR_INT, ResourceTransfer::count,
+			ResourceTransfer::new
+		);
+
+		@Override
+		public Type<? extends CustomPacketPayload> type() {
+			return TYPE;
+		}
+	}
+
+	/** Host -> guest: how many requested Minecraft items were actually accepted. */
+	public record ResourceTransferAck(int requestId, int itemHash, int accepted) implements CustomPacketPayload {
+		public static final Type<ResourceTransferAck> TYPE = new Type<>(Identifier.fromNamespaceAndPath(SkyCraft.MOD_ID, "resource_transfer_ack"));
+		public static final StreamCodec<RegistryFriendlyByteBuf, ResourceTransferAck> CODEC = StreamCodec.composite(
+			ByteBufCodecs.INT, ResourceTransferAck::requestId,
+			ByteBufCodecs.INT, ResourceTransferAck::itemHash,
+			ByteBufCodecs.VAR_INT, ResourceTransferAck::accepted,
+			ResourceTransferAck::new
+		);
+
+		@Override
+		public Type<? extends CustomPacketPayload> type() {
+			return TYPE;
+		}
+	}
+
 	/** Client -> server: the player hit Skyrim's geometry in this cell (SkyDig.open). */
 	public record DigOpen(int world, BlockPos pos, int material) implements CustomPacketPayload {
 		public static final Type<DigOpen> TYPE = new Type<>(Identifier.fromNamespaceAndPath(SkyCraft.MOD_ID, "dig_open"));
@@ -85,6 +119,7 @@ public final class SkyNet {
 
 	public static void init() {
 		PayloadTypeRegistry.serverboundPlay().register(Hurt.TYPE, Hurt.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(ResourceTransfer.TYPE, ResourceTransfer.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(DigOpen.TYPE, DigOpen.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(DigReveal.TYPE, DigReveal.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(DigOpen.TYPE, (payload, context) -> {
@@ -97,6 +132,18 @@ public final class SkyNet {
 			context.server().execute(() -> SkyDig.reveal(player, payload.world(), payload.cells(), materials));
 		});
 		PayloadTypeRegistry.clientboundPlay().register(Died.TYPE, Died.CODEC);
+		PayloadTypeRegistry.clientboundPlay().register(ResourceTransferAck.TYPE, ResourceTransferAck.CODEC);
+		ServerPlayNetworking.registerGlobalReceiver(ResourceTransfer.TYPE, (payload, context) -> {
+			ServerPlayer player = context.player();
+			int count = Math.max(0, Math.min(payload.count(), 4096));
+			context.server().execute(() -> {
+				int accepted = ResourceBridge.grant(player, payload.itemHash(), count);
+				if (ServerPlayNetworking.canSend(player, ResourceTransferAck.TYPE)) {
+					ServerPlayNetworking.send(player,
+						new ResourceTransferAck(payload.requestId(), payload.itemHash(), accepted));
+				}
+			});
+		});
 		ServerPlayNetworking.registerGlobalReceiver(Hurt.TYPE, (payload, context) -> {
 			ServerPlayer player = context.player();
 			// A hit's worth of damage, whatever the guest's client claims (friends only, but still).

@@ -13,6 +13,8 @@
     "FlowingFluidMixin",
     "ItemMixin",
     "MinecraftServerFlightMixin",
+    "MobCollideMixin",
+    "MobSkyrimFoesMixin",
     "PlayerEdgeMixin",
     "PressurePlateMixin",
     "ProjectileMixin",

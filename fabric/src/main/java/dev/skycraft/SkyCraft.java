@@ -24,6 +24,13 @@ public final class SkyCraft implements ModInitializer {
 		SkyCombat.init();
 		dev.skycraft.net.SkyNet.init();
 		dev.skycraft.world.SkyDig.init();
+		dev.skycraft.world.SkyTime.init();
+		dev.skycraft.combat.SkyrimSpawner.init();
+		dev.skycraft.weapon.SkyrimWeapons.init();
+		dev.skycraft.weapon.WeaponAffixes.init();
+		dev.skycraft.landon.LandonItems.init();
+		dev.skycraft.magic.RangedMagic.init();
+		dev.skycraft.armor.SkyrimArmor.init();
 		ServerLifecycleEvents.SERVER_STARTED.register(SkyCraft::configureServer);
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			giveStarterKit(handler.getPlayer());
@@ -32,7 +39,10 @@ public final class SkyCraft implements ModInitializer {
 		});
 	}
 
-	/** The mirror world is a void that only exists to host the player; Skyrim drives time and spawning. */
+	/**
+	 * The mirror world is a void that only exists to host the player. Minecraft's own clock and spawner
+	 * are off: Skyrim sets the time of day (SkyTime), and mobs are spawned over Skyrim's ground (SkyrimSpawner).
+	 */
 	private static void configureServer(MinecraftServer server) {
 		GameRules rules = server.getGameRules();
 		rules.set(GameRules.ADVANCE_TIME, false, server);
@@ -48,6 +58,33 @@ public final class SkyCraft implements ModInitializer {
 		rules.set(GameRules.SHOW_ADVANCEMENT_MESSAGES, false, server);
 		server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(), "time set noon");
 		LOG.info("SkyCraft: mirror world configured");
+
+		// The list of every distinct collision shape, for the collision model library (tools/make_collision_library.py). Written by
+		// itself the first time the world starts (and again if the game's blocks change, e.g. a mod was added); -Dskycraft.dumpShapes=false
+		// turns it off, -Dskycraft.dumpShapes=force writes it every start.
+		try {
+			String mode = System.getProperty("skycraft.dumpShapes", "auto");
+			java.nio.file.Path catalog = net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve("skycraft").resolve("shape_catalog.json");
+			if (!"false".equalsIgnoreCase(mode) && ("force".equalsIgnoreCase(mode) || "true".equalsIgnoreCase(mode) || !java.nio.file.Files.exists(catalog)
+				|| !dev.skycraft.world.ShapeCatalog.upToDate(catalog))) {
+				dev.skycraft.world.ShapeCatalog.dump(catalog);
+			}
+		} catch (RuntimeException ex) {
+			LOG.warn("SkyCraft: shape catalog skipped", ex);
+		}
+
+		// The same for mobs: every distinct mob body size (modded mobs included), for the mob body library (MobBodies.cpp). -Dskycraft.dumpMobs=false
+		// turns it off, -Dskycraft.dumpMobs=force writes it every start.
+		try {
+			String mode = System.getProperty("skycraft.dumpMobs", "auto");
+			java.nio.file.Path mobCatalog = net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve("skycraft").resolve("mob_catalog.json");
+			if (!"false".equalsIgnoreCase(mode) && ("force".equalsIgnoreCase(mode) || "true".equalsIgnoreCase(mode) || !java.nio.file.Files.exists(mobCatalog)
+				|| !dev.skycraft.world.MobCatalog.upToDate(mobCatalog))) {
+				dev.skycraft.world.MobCatalog.dump(mobCatalog);
+			}
+		} catch (RuntimeException ex) {
+			LOG.warn("SkyCraft: mob catalog skipped", ex);
+		}
 	}
 
 	/**

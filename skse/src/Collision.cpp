@@ -1,6 +1,7 @@
 #include "Collision.h"
 
 #include "Dig.h"
+#include "Game.h"
 
 namespace skycraft
 {
@@ -355,6 +356,15 @@ namespace skycraft
 				}
 				Body body{ shape, xf, {}, {}, IsStairHelper(collidable.GetCollisionLayer()) };
 				HkAabbToMc(box, k, body.lo, body.hi);
+				// A mob's collision box is Skyrim's side of the mob, not a wall: sent to Minecraft it would wall every mob in (an arrow it shoots
+				// sticks in its own box, the crosshair and swings stop at it before they reach the mob). Skyrim's own hits on it still work.
+				if (a_fixed && collidable.GetCollisionLayer() == RE::COL_LAYER::kStatic && MobBodies::AnyBodies() && body.hi[0] - body.lo[0] <= 8.0f &&
+					body.hi[1] - body.lo[1] <= 8.0f && body.hi[2] - body.lo[2] <= 8.0f) {
+					const auto* owner = RE::TESHavokUtilities::FindCollidableRef(collidable);
+					if (owner && MobBodies::MobOfRef(owner->GetFormID()) >= 0) {
+						continue;
+					}
+				}
 				if (a_fixed && Dig::IsDiggableCollidable(&collidable)) {
 					body.diggable = true;
 					body.ref = RE::TESHavokUtilities::FindCollidableRef(collidable);

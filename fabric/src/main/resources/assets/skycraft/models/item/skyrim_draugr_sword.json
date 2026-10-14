@@ -1,0 +1,36 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "skycraft:item/skyrim_draugr_sword"
+  },
+  "display": {
+    "firstperson_righthand": {
+      "scale": [
+        1.45,
+        1.45,
+        1.45
+      ]
+    },
+    "firstperson_lefthand": {
+      "scale": [
+        1.45,
+        1.45,
+        1.45
+      ]
+    },
+    "thirdperson_righthand": {
+      "scale": [
+        1.45,
+        1.45,
+        1.45
+      ]
+    },
+    "thirdperson_lefthand": {
+      "scale": [
+        1.45,
+        1.45,
+        1.45
+      ]
+    }
+  }
+}
