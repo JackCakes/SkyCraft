@@ -12,6 +12,7 @@ import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.entity.projectile.Projectile;
@@ -35,9 +36,47 @@ public class SkyrimActorEntity extends LivingEntity {
 	private float pendingDamage;
 	private int pendingFlags;
 	private int pendingWeapon;
+	/** Entity id + 1 of the mob that last hurt this actor (0: none); Skyrim attributes the hit to that mob's stand-in. */
+	private int pendingMobId;
 	private double pushX, pushZ;
 	private float pushStrength;
 	private boolean hitThisTick;
+	// Who dealt this tick's damage: Minecraft mobs, and anything else (the player, fire, explosions
+	// with no owner). Skyrim is told it was a mob's hit only if nothing else contributed.
+	private boolean mobHit, otherHit;
+	// The actor's Proto.ACTOR_* flags from Skyrim's last update (server side only).
+	private int skyFlags;
+
+	// Entity.invulnerableTime is private in this Minecraft; it isn't obfuscated, so reach it by name.
+	private static final java.lang.reflect.Field IMMUNITY = findImmunity();
+
+	private static java.lang.reflect.Field findImmunity() {
+		for (Class<?> c = SkyrimActorEntity.class; c != null; c = c.getSuperclass()) {
+			try {
+				java.lang.reflect.Field f = c.getDeclaredField("invulnerableTime");
+				f.setAccessible(true);
+				return f;
+			} catch (ReflectiveOperationException | RuntimeException e) {
+				// try the parent class
+			}
+		}
+		dev.skycraft.SkyCraft.LOG.warn("SkyCraft: can't reach Entity.invulnerableTime; Skyrim NPCs may shrug off repeated hits");
+		return null;
+	}
+
+	private static void tickImmunity(Entity entity) {
+		if (IMMUNITY == null) {
+			return;
+		}
+		try {
+			int left = IMMUNITY.getInt(entity);
+			if (left > 0) {
+				IMMUNITY.setInt(entity, left - 1);
+			}
+		} catch (ReflectiveOperationException | RuntimeException e) {
+			// leave it
+		}
+	}
 
 	public SkyrimActorEntity(EntityType<? extends SkyrimActorEntity> type, Level level) {
 		super(type, level);
@@ -45,6 +84,45 @@ public class SkyrimActorEntity extends LivingEntity {
 		this.noPhysics = true;
 		this.setInvisible(true);
 		this.setSilent(true);
+	}
+
+	public void setSkyFlags(int flags) {
+		this.skyFlags = flags;
+	}
+
+	/** One that fights (not a civilian who flees): see NpcFightsBack. */
+	public boolean fighter() {
+		return (this.skyFlags & Proto.ACTOR_FIGHTER) != 0;
+	}
+
+	/** A person (human, elf, orc...), not an animal or creature. */
+	public boolean person() {
+		return (this.skyFlags & Proto.ACTOR_PERSON) != 0;
+	}
+
+	/** Hostile to the player right now (a bandit, not a shopkeeper). */
+	public boolean hostileToPlayer() {
+		return (this.skyFlags & Proto.ACTOR_HOSTILE) != 0;
+	}
+
+	/** Holds a bow or crossbow. */
+	public boolean bow() {
+		return (this.skyFlags & Proto.ACTOR_BOW) != 0;
+	}
+
+	/** Skyrim's damage for the weapon in its hand (fists when none), as reported in the actor table. */
+	public int weaponDamage() {
+		return (this.skyFlags >> Proto.ACTOR_DAMAGE_SHIFT) & 0xFF;
+	}
+
+	/** Its weapon is out of its sheath. */
+	public boolean weaponDrawn() {
+		return (this.skyFlags & Proto.ACTOR_WEAPON_DRAWN) != 0;
+	}
+
+	/** Already in a fight Skyrim runs itself. */
+	public boolean inSkyrimCombat() {
+		return (this.skyFlags & Proto.ACTOR_IN_COMBAT) != 0;
 	}
 
 	public int formId() {
@@ -84,6 +162,26 @@ public class SkyrimActorEntity extends LivingEntity {
 		return EntityDimensions.scalable(this.entityData.get(WIDTH), this.entityData.get(HEIGHT));
 	}
 
+	private static int mobHurtLogs;
+
+	private static boolean isCreeper(@org.jspecify.annotations.Nullable Entity entity) {
+		return entity != null && "creeper".equals(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).getPath());
+	}
+
+	@Override
+	public boolean hurtServer(ServerLevel level, DamageSource source, float damage) {
+		// A creeper's blast doesn't hurt Skyrim's people: it goes off for the player, and an NPC standing nearby is left alone.
+		if (source.is(net.minecraft.tags.DamageTypeTags.IS_EXPLOSION) && (isCreeper(source.getEntity()) || isCreeper(source.getDirectEntity()))) {
+			return false;
+		}
+		boolean hurt = super.hurtServer(level, source, damage);
+		if (source.getEntity() instanceof Mob attacker && mobHurtLogs++ < 60) {
+			dev.skycraft.SkyCraft.LOG.info("SkyCraft: {} ({}) attacked Skyrim actor {} for {}: {}", attacker.getName().getString(), source.type().msgId(),
+				String.format("%08X", this.formId()), damage, hurt ? "landed" : "refused");
+		}
+		return hurt;
+	}
+
 	@Override
 	protected void actuallyHurt(ServerLevel level, DamageSource source, float dmg) {
 		// Minecraft has applied everything (crit, sharpness, strength, cooldown, invulnerability
@@ -91,11 +189,34 @@ public class SkyrimActorEntity extends LivingEntity {
 		if (this.isInvulnerableTo(level, source) || dmg <= 0.0F) {
 			return;
 		}
+		ItemStack affixWeapon = source.getWeaponItem();
+		if (affixWeapon == null && source.getDirectEntity() == source.getEntity()
+				&& source.getEntity() instanceof LivingEntity attacker) {
+			affixWeapon = attacker.getMainHandItem();
+		}
+		float affixMultiplier = dev.skycraft.weapon.WeaponAffixes.rollHitDamageMultiplier(affixWeapon, this.getRandom());
+		if (affixMultiplier != 1.0F) {
+			dmg *= affixMultiplier;
+			dev.skycraft.SkyCraft.LOG.info("SkyCraft affix proc: {}x damage on {}", affixMultiplier, this.getName().getString());
+		}
 		this.pendingDamage += dmg;
 		if (source.getDirectEntity() instanceof Projectile) {
 			this.pendingFlags |= Proto.HIT_PROJECTILE;
 		}
 		this.pendingWeapon = weaponClass(source);
+		// Only the player (or something the player threw or shot) is "the player's hit": that is what earns a bounty
+		// and starts a fight with the player in Skyrim. Everything else is nobody's fault in Skyrim's eyes: a mob's
+		// blow, a witch's potion, and also the poison, fire or fall damage that has no attacker at all.
+		Entity attacker = source.getEntity();
+		if (attacker instanceof net.minecraft.world.entity.player.Player
+			|| (attacker == null && source.getDirectEntity() instanceof net.minecraft.world.entity.player.Player)) {
+			this.otherHit = true;
+		} else {
+			this.mobHit = true;
+			if (attacker instanceof Mob mobAttacker) {
+				this.pendingMobId = mobAttacker.getId() + 1;
+			}
+		}
 		if (source.is(net.minecraft.tags.DamageTypeTags.IS_FIRE)) {
 			this.pendingFlags |= Proto.HIT_FIRE;
 		}
@@ -153,8 +274,12 @@ public class SkyrimActorEntity extends LivingEntity {
 		if (!this.hitThisTick) {
 			return null;
 		}
-		float[] hit = { this.pendingDamage, (float) this.pushX, (float) this.pushZ, this.pushStrength, Float.intBitsToFloat(this.pendingFlags),
-			Float.intBitsToFloat(this.pendingWeapon) };
+		int flags = this.pendingFlags | (this.mobHit && !this.otherHit ? Proto.HIT_FROM_MOB : 0);
+		float[] hit = { this.pendingDamage, (float) this.pushX, (float) this.pushZ, this.pushStrength, Float.intBitsToFloat(flags),
+			Float.intBitsToFloat(this.pendingWeapon | ((flags & Proto.HIT_FROM_MOB) != 0 ? (this.pendingMobId & 0xFFFFFF) << 8 : 0)) };
+		this.pendingMobId = 0;
+		this.mobHit = false;
+		this.otherHit = false;
 		this.pendingDamage = 0.0F;
 		this.pendingFlags = 0;
 		this.pushX = this.pushZ = 0.0;
@@ -167,6 +292,12 @@ public class SkyrimActorEntity extends LivingEntity {
 	public void tick() {
 		// Position and rotation come from Skyrim (SkyCombat); keep hurt timers and fire ticking.
 		this.baseTick();
+		// aiStep never runs for a stand-in, and that is what counts the post-hit immunity and hurt
+		// timers down: without this the first hit lands and every later one (a mob's, an arrow) bounces off.
+		tickImmunity(this);
+		if (this.hurtTime > 0) {
+			this.hurtTime--;
+		}
 		this.setHealth(this.getMaxHealth());
 	}
 

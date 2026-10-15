@@ -4,6 +4,14 @@
 #include "Dig.h"
 #include "Perf.h"
 
+#include <chrono>
+
+namespace skycraft::BlockCrates
+{
+	void Update(RE::PlayerCharacter* a_player, float a_delta);
+	void Release();
+}
+
 namespace skycraft
 {
 	Runtime& State()
@@ -376,6 +384,47 @@ namespace skycraft
 			hud->uiMovie->SetVariable("_root.HUDMovieBaseInstance.StealthMeterInstance._visible", RE::GFxValue(!a_hide || a_sneaking));
 		}
 
+		// The takeover reason while the player has switched to Skyrim's own controls (Input.cpp).
+		constexpr const char* kSkyrimControl = "Skyrim control mode";
+
+		// Whether the player is somewhere people live: a city, town, village, farm, inn, house, castle, mine, stronghold. Minecraft's
+		// natural spawning stays out of such places (the flag goes to Minecraft in SkyState). Skyrim says what a place is with keywords
+		// on its location, and a place inside a city (a shop, a house) is part of a location whose parent is the city, so the parents
+		// are looked at too. The answer is kept until the player's location changes.
+		bool InSettlement(RE::PlayerCharacter* a_player)
+		{
+			static RE::FormID lastLocation = 0xFFFFFFFF;
+			static bool       lastAnswer = false;
+			const RE::BGSLocation* location = nullptr;
+			if constexpr (requires { a_player->GetCurrentLocation(); }) {
+				location = a_player->GetCurrentLocation();
+			}
+			const RE::FormID id = location ? location->GetFormID() : 0;
+			if (id == lastLocation) {
+				return lastAnswer;
+			}
+			static constexpr std::array<std::string_view, 12> kPlaces{ "LocTypeCity", "LocTypeTown", "LocTypeSettlement", "LocTypeInn", "LocTypeFarm", "LocTypeDwelling",
+				"LocTypeHouse", "LocTypePlayerHouse", "LocTypeCastle", "LocTypeStore", "LocTypeMine", "LocTypeOrcStronghold" };
+			bool answer = false;
+			for (int depth = 0; location && depth < 5 && !answer; ++depth) {
+				for (const auto place : kPlaces) {
+					if constexpr (requires { location->HasKeywordString(std::string_view{}); }) {
+						if (location->HasKeywordString(place)) {
+							answer = true;
+							break;
+						}
+					}
+				}
+				location = location->parentLoc;
+			}
+			if (id != 0 || lastLocation != 0xFFFFFFFF) {
+				logger::info("player's location {:08X}: {}", id, answer ? "a place people live (no mobs spawn)" : "not a settlement");
+			}
+			lastLocation = id;
+			lastAnswer = answer;
+			return answer;
+		}
+
 		// Skyrim takes the player for its own animations: sitting, crafting stations, beds, pull-bar
 		// levers and other furniture (it walks the player into place, plays the animation and uses its
 		// furniture camera), riding a horse, kill moves, and scripted scenes that drive the player.
@@ -519,6 +568,8 @@ namespace skycraft
 			auto& link = Link::Get();
 			auto* ui = RE::UI::GetSingleton();
 			link.Heartbeat();
+			// Read once, so the takeover below and the state sent to Minecraft agree within a frame.
+			const bool skyrimMode = st.skyrimMode;
 
 			const bool mcAlive = link.McAlive();
 			const bool haveMc = mcAlive && link.ReadMcState(mc);
@@ -579,7 +630,7 @@ namespace skycraft
 				teleportPending = true;
 				haveLastSet = false;
 				settleTimer = kSettleSeconds;
-			} else if (haveLastSet && current.GetDistance(lastSetPos) > kSkyrimTeleportThreshold) {
+			} else if (!skyrimMode && haveLastSet && current.GetDistance(lastSetPos) > kSkyrimTeleportThreshold) {
 				logger::info("Skyrim moved the player ({:.0f} units); resyncing Minecraft", current.GetDistance(lastSetPos));
 				teleportPending = true;
 				haveLastSet = false;
@@ -607,17 +658,85 @@ namespace skycraft
 				st.pitch = std::clamp(st.pitch + dy * factor, -90.0f, 90.0f);
 			}
 
+			// A Minecraft world reset (Input.cpp asks, Minecraft does it): Skyrim's own controls while
+			// Minecraft's world is thrown away and loaded again, then back to Minecraft's if that's where
+			// the player was. Minecraft says what it's doing with kMcResetting, so this follows it.
+			{
+				using Clock = std::chrono::steady_clock;
+				constexpr auto       kAnswerTimeout = std::chrono::seconds(5);   // Minecraft says it's on it
+				constexpr auto       kResetTimeout = std::chrono::seconds(120);  // and has its new world
+				static bool          restoreMinecraft = false;
+				static int           seenPhase = 0;
+				static Clock::time_point since{};
+				const auto enter = [&](int a_phase) {
+					st.worldReset = a_phase;
+					seenPhase = a_phase;
+					since = Clock::now();
+				};
+				const int phase = st.worldReset;
+				const bool mcResetting = haveMc && (mc.flags & proto::kMcResetting);
+				if (phase != seenPhase) {
+					seenPhase = phase;
+					since = Clock::now();  // the key press just set phase 1
+				}
+				const auto waited = Clock::now() - since;
+				if (phase != 2 && mcResetting) {
+					restoreMinecraft = !st.skyrimMode;
+					st.skyrimMode = true;
+					enter(2);
+					logger::info("world reset: Minecraft is starting over; Skyrim's controls until it's back");
+				} else if (phase == 1 && waited > kAnswerTimeout) {
+					enter(0);
+					logger::warn("world reset: Minecraft didn't start one");
+					RE::SendHUDMessage::ShowHUDMessage("SkyCraft: the world reset didn't start (Minecraft is in a friend's world, or didn't answer).");
+				} else if (phase == 2 && haveMc && !mcResetting && st.mcInWorld) {
+					enter(0);
+					if (restoreMinecraft) {
+						st.skyrimMode = false;
+					}
+					logger::info("world reset: done; {}'s controls", restoreMinecraft ? "Minecraft" : "Skyrim");
+					RE::SendHUDMessage::ShowHUDMessage("SkyCraft: Minecraft world reset.");
+				} else if (phase == 2 && waited > kResetTimeout) {
+					enter(0);
+					logger::warn("world reset: Minecraft hasn't come back with a world; staying on Skyrim's controls");
+					RE::SendHUDMessage::ShowHUDMessage("SkyCraft: the world reset is taking too long. Staying on Skyrim's controls.");
+				}
+			}
+
+			// The player's own switch to Skyrim's controls (Input.cpp) is a takeover too, one that doesn't
+			// end by itself: Skyrim gets the controls, the camera and the HUD, Minecraft's input stops, and
+			// Minecraft's player follows Skyrim's (kSkyrimControl below). Say which mode it is when it changes.
+			static bool announcedMode = false;
+			if (skyrimMode != announcedMode) {
+				announcedMode = skyrimMode;
+				const std::string key = Input::ToggleKeyName();
+				const std::string note = skyrimMode ? "SkyCraft: Skyrim controls. Press " + key + " for Minecraft." :
+				                                      "SkyCraft: Minecraft controls. Press " + key + " for Skyrim.";
+				RE::SendHUDMessage::ShowHUDMessage(note.c_str());
+			}
+
 			// Minecraft holds its player still after a teleport until Skyrim's ground has arrived
 			// around them. If it's holding somewhere Skyrim's player isn't, that ground never comes:
 			// send it again to where Skyrim's player really is.
 			static const char* takeover = nullptr;
-			const char*        takeoverNow = a_player->IsDead() ? nullptr : SkyrimTakeover(a_player);
+			const char*        takeoverNow = a_player->IsDead() ? nullptr : skyrimMode ? kSkyrimControl : SkyrimTakeover(a_player);
 			if ((takeoverNow != nullptr) != (takeover != nullptr)) {
 				if (takeoverNow) {
 					logger::info("Skyrim takes the player ({})", takeoverNow);
 				} else {
 					logger::info("Skyrim hands the player back");
 					teleportPending = true;  // Minecraft picks up wherever Skyrim left the player
+					if (takeover == kSkyrimControl && !loading) {
+						// Back to Minecraft by choice. Resync now instead of next frame: this frame would
+						// otherwise let Minecraft drive from the facing it had before Skyrim's mode, and
+						// the resync would then pick that stale facing up as Skyrim's.
+						st.yaw = HeadingToMcYaw(a_player->data.angle.z);
+						st.pitch = a_player->data.angle.x * kRadToDeg;
+						st.lookInitialized = true;
+						++teleportSeq;
+						teleportPending = false;
+						haveLastSet = false;
+					}
 				}
 			}
 			takeover = takeoverNow;
@@ -642,6 +761,8 @@ namespace skycraft
 				logger::info("puppet {}", puppet ? "on (Minecraft drives the player)" : "off");
 			}
 			st.puppeting = puppet;
+			// Skyrim's mode still shows Minecraft's world (blocks, mobs, items); not while loading or dead.
+			st.worldVisible = puppet || (skyrimMode && haveMc && st.mcInWorld && !loading && !a_player->IsDead());
 			if (puppet) {
 				EnsureControlsEnabled();
 				Game::NoteFrameStep('P');
@@ -654,9 +775,34 @@ namespace skycraft
 			st.mcGuiScale = haveMc ? static_cast<int>(mc.guiScale) : 0;
 			Input::SetActivatePromptKey(puppet);
 			Combat::PerFrame(a_player, puppet, a_delta);
+			LockOn::Update(a_player, skyrimMode && haveMc && st.mcInWorld && !loading && !a_player->IsDead());
 			WorldRender::UpdateRagdoll(a_player, haveMc && st.mcInWorld);
 			if (puppet) {
 				NpcBlocks::PushActorsOut(a_player, a_delta);
+				BlockCrates::Release();
+				BlockCollision::Release();
+			} else if (skyrimMode && haveMc && st.mcInWorld && !loading && !a_player->IsDead()) {
+				// Skyrim's own control mode: the blocks are still there, for NPCs and for the player.
+				NpcBlocks::PushActorsOut(a_player, a_delta);
+				NpcBlocks::StepUpPlayer(a_player, a_delta);
+				if (BlockCollision::Wanted()) {
+					BlockCollision::Update(a_player, a_delta);
+					if (BlockCollision::NeedCrates()) {
+						BlockCrates::Update(a_player, a_delta);
+					} else {
+						BlockCrates::Release();
+					}
+				} else {
+					BlockCollision::Release();
+					BlockCrates::Update(a_player, a_delta);
+				}
+				auto* proxyController = skyrim_cast<RE::bhkCharProxyController*>(a_player->GetCharController());
+				auto* proxy = proxyController ? proxyController->GetCharacterProxy() : nullptr;
+				Dig::SetSkyrimPlayer(proxy && proxy->shapePhantom ? &proxy->shapePhantom->collidable : nullptr);
+			} else {
+				Dig::SetSkyrimPlayer(nullptr);
+				BlockCrates::Release();
+				BlockCollision::Release();
 			}
 
 			// Interpolate Minecraft's 20 Hz physics ticks on our own clock (what MC's renderer does
@@ -976,7 +1122,8 @@ namespace skycraft
 
 			// Tell Minecraft where Skyrim's player is and where they're looking.
 			proto::SkyState sky{};
-			sky.flags = (cell ? proto::kSkyInGame : 0u) | (menu ? proto::kSkyMenuOpen : 0u) | (loading ? proto::kSkyLoading : 0u);
+			sky.flags = (cell ? proto::kSkyInGame : 0u) | (menu ? proto::kSkyMenuOpen : 0u) | (loading ? proto::kSkyLoading : 0u) |
+			            (skyrimMode ? proto::kSkyrimControl : 0u) | (InSettlement(a_player) ? proto::kSkySettlement : 0u);
 			const auto skyMc = SkyToMc(current);
 			sky.worldId = worldId;
 			sky.collisionEpoch = epoch;
@@ -990,6 +1137,10 @@ namespace skycraft
 			sky.viewportH = static_cast<std::uint32_t>(st.viewportH.load());
 			if (auto* calendar = RE::Calendar::GetSingleton()) {
 				sky.gameHour = calendar->GetHour();
+			}
+			{
+				const float maxHealth = a_player->GetActorValueMax(RE::ActorValue::kHealth);
+				sky.healthFrac = maxHealth > 0.0f ? std::clamp(a_player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kHealth) / maxHealth, 0.0f, 1.0f) : 1.0f;
 			}
 			link.WriteSkyState(sky);
 
@@ -1009,7 +1160,8 @@ namespace skycraft
 			const McVec lightCentre = puppet ? McVec{ mc.x, mc.y, mc.z } : skyMc;
 			{
 				Perf::Scope timer(Perf::kLights);
-				BlockLights::Update(haveMc && st.mcInWorld && !loading && cell ? &lightCentre : nullptr, a_delta);
+				// (Not in Skyrim's mode: the blocks aren't drawn then, so their light would come from nothing.)
+				BlockLights::Update(!skyrimMode && haveMc && st.mcInWorld && !loading && cell ? &lightCentre : nullptr, a_delta);
 			}
 
 			// Blocks dug out of Skyrim's world: its collision around them goes to Minecraft again, and
@@ -1023,7 +1175,8 @@ namespace skycraft
 			}
 			// Not while the world is still settling after a load (its cells are still being attached).
 			static float digSettled = 0.0f;
-			digSettled = puppet && !loading && cell ? digSettled + a_delta : 0.0f;
+			// (In Skyrim's own control mode too: a creeper's crater must show there as well.)
+			digSettled = (puppet || (skyrimMode && haveMc && st.mcInWorld)) && !loading && cell ? digSettled + a_delta : 0.0f;
 			{
 				Perf::Scope timer(Perf::kDigMeshes);
 				Dig::UpdateMeshes(digSettled > 3.0f ? a_player : nullptr, a_delta, !dugChanged.empty());

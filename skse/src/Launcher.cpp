@@ -1,5 +1,7 @@
 #include "Game.h"
 
+#include <cctype>
+
 #include <ExDisp.h>
 #include <TlHelp32.h>
 #include <ShlDisp.h>
@@ -249,6 +251,39 @@ namespace skycraft
 			return ini.GetBoolValue("Debug", "bDiagnostics", false);
 		}();
 		return on;
+	}
+
+	std::string StandInBaseSetting()
+	{
+		static const std::string value = [] {
+			CSimpleIniA ini;
+			ini.SetUnicode();
+			ini.LoadFile("Data/SKSE/Plugins/SkyCraft.ini");
+			std::string found = ini.GetValue("Mobs", "sStandInBase", "");
+			while (!found.empty() && std::isspace(static_cast<unsigned char>(found.back()))) {
+				found.pop_back();
+			}
+			logger::info("Mob stand-ins are made from: {}", found.empty() ? "the default (a rabbit, which makes no growls)" : found);
+			return found;
+		}();
+		return value;
+	}
+
+	int StandInHideMode()
+	{
+		static const int mode = [] {
+			CSimpleIniA ini;
+			ini.SetUnicode();
+			ini.LoadFile("Data/SKSE/Plugins/SkyCraft.ini");
+			std::string value = ini.GetValue("Mobs", "sStandInHide", "geometry");
+			for (auto& c : value) {
+				c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+			}
+			const int found = value == "none" ? 0 : value == "root" ? 2 : value == "alpha" ? 3 : 1;
+			logger::info("Mob stand-ins are hidden by: {}", found == 0 ? "nothing (shown)" : found == 2 ? "culling the whole actor" : found == 3 ? "alpha" : "hiding their geometry");
+			return found;
+		}();
+		return mode;
 	}
 }
 

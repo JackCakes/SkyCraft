@@ -187,7 +187,9 @@ public final class SkyClient {
 		DiscordPresence.tick(minecraft);
 		SkyDigClient.tick(minecraft);
 		freezeWhileUnlinked(minecraft);
-		holdUntilReady(minecraft);
+		if (!followSkyrimPlayer(minecraft)) {
+			holdUntilReady(minecraft);
+		}
 		publishTick(minecraft);
 	}
 
@@ -210,6 +212,88 @@ public final class SkyClient {
 		player.yo = unlinkedHold.y;
 		player.zo = unlinkedHold.z;
 		player.resetFallDistance();
+	}
+
+	/**
+	 * The player switched to Skyrim's own controls (Proto.SKY_SKYRIM_CONTROL): Skyrim moves its player
+	 * and Minecraft gets no input, so Minecraft's player rides along on Skyrim's instead of standing
+	 * where it was left. Left behind, it would lose its ground (Skyrim's collision streams in around
+	 * Skyrim's player), fall out of the world and die, and a Minecraft death kills the Skyrim player.
+	 * It's also kept at full health, so drowning in Skyrim's water or standing inside a block can't do
+	 * the same. Skyrim says where the player is every frame, so no teleports are needed.
+	 *
+	 * @return true while it has the player, so {@link #holdUntilReady} stays out of the way. It
+	 *         doesn't while Skyrim is loading: parking the player there is what that's for.
+	 */
+	/** Health is shared while Skyrim has the controls: Skyrim's player is the real one, Minecraft's shows it. */
+	private static volatile boolean healthShared;
+	private static volatile float lastSharedHealth;
+
+	private static boolean followSkyrimPlayer(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+		if (linked && player != null && !sky.skyrimControl() && healthShared) {
+			// Skyrim's control mode has ended: the health Skyrim's player has is the one Minecraft's player carries on with.
+			healthShared = false;
+			final float frac = sky.healthFrac;
+			var server = minecraft.getSingleplayerServer();
+			if (server != null && frac > 0.0F) {
+				var uuid = player.getUUID();
+				server.execute(() -> {
+					ServerPlayer sp = server.getPlayerList().getPlayer(uuid);
+					if (sp != null && !sp.isDeadOrDying()) {
+						sp.setHealth(Math.max(1.0F, Math.min(1.0F, frac) * sp.getMaxHealth()));
+					}
+				});
+			}
+		}
+		if (!linked || player == null || !sky.skyrimControl() || !sky.inGame() || sky.loading()) {
+			return false;
+		}
+		holdPos = null;
+		holdSince = 0;
+		player.setDeltaMovement(Vec3.ZERO);
+		player.setPos(sky.x, sky.y, sky.z);
+		player.xo = sky.x;
+		player.yo = sky.y;
+		player.zo = sky.z;
+		player.resetFallDistance();
+		var server = minecraft.getSingleplayerServer();
+		if (server != null) {
+			var uuid = player.getUUID();
+			final float skyFrac = sky.healthFrac;
+			server.execute(() -> {
+				ServerPlayer sp = server.getPlayerList().getPlayer(uuid);
+				if (sp != null && !sp.isDeadOrDying()) {
+					float max = sp.getMaxHealth();
+					if (!healthShared) {
+						// The first moment of Skyrim's control: Skyrim's player takes the health Minecraft's had.
+						healthShared = true;
+						lastSharedHealth = sp.getHealth();
+						SkyLink.pushEvent(dev.skycraft.link.Proto.EV_PLAYER_HEALTH, 0, sp.getHealth() / max, 0.0F, 0.0F, 0.0F, 0);
+					} else {
+						float now = sp.getHealth();
+						var by = sp.getLastHurtByMob();
+						// Only a mob's blow counts (not suffocating in Skyrim's rock or falling while riding along).
+						if (now < lastSharedHealth - 0.01F && by != null && sp.tickCount - sp.getLastHurtByMobTimestamp() <= 5) {
+							double dx = sp.getX() - by.getX(), dz = sp.getZ() - by.getZ();
+							double len = Math.sqrt(dx * dx + dz * dz);
+							// A shot is told from a blow (Skyrim staggers a target on one, not the other).
+							var lastSource = sp.getLastDamageSource();
+							int hitFlags = lastSource != null && lastSource.getDirectEntity() instanceof net.minecraft.world.entity.projectile.Projectile
+								? dev.skycraft.link.Proto.HIT_PROJECTILE : 0;
+							SkyLink.pushEvent(dev.skycraft.link.Proto.EV_PLAYER_HURT, by.getId() + 1, lastSharedHealth - now,
+								len > 1.0E-4 ? (float) (-dx / len) : 0.0F, len > 1.0E-4 ? (float) (-dz / len) : 0.0F, 0.0F, hitFlags);
+						}
+						// Minecraft's player shows Skyrim's health, and never dies on its own here.
+						float shown = skyFrac > 0.0F ? Math.max(1.0F, Math.min(1.0F, skyFrac) * max) : max;
+						sp.setHealth(shown);
+						lastSharedHealth = shown;
+					}
+					sp.resetFallDistance();
+				}
+			});
+		}
+		return true;
 	}
 
 	/**
@@ -380,12 +464,16 @@ public final class SkyClient {
 		if (minecraft.gui.screen() != null) {
 			flags |= Proto.MC_SCREEN_OPEN;
 		}
+		if (MirrorWorld.resetting()) {
+			flags |= Proto.MC_RESETTING;  // the reset key: Skyrim keeps the player on its own controls meanwhile
+		}
 		mc.flags = flags;
 		mc.sensitivity = minecraft.options.sensitivity().get().floatValue();
 		mc.teleportAck = holdPos == null ? teleportAck : teleportAck - 1; // not "arrived" until we are released
 		mc.guiScale = minecraft.getWindow().getGuiScale();
 		mc.frameCounter = ++frameCounter;
 		SkyLink.writeMcState(mc);
+		MirrorWorld.frameShown();
 
 		if ((flags & Proto.MC_IN_WORLD) != 0) {
 			try {

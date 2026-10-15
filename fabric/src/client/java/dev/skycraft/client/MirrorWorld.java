@@ -1,6 +1,18 @@
 package dev.skycraft.client;
 
 import dev.skycraft.SkyCraft;
+import dev.skycraft.world.SkyDig;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Stream;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.core.registries.Registries;
@@ -23,6 +35,23 @@ public final class MirrorWorld {
 	private static @org.jspecify.annotations.Nullable String sessionJoin;
 	// Shown in chat once the player is in a world again (why they're back in their own, ...).
 	private static @org.jspecify.annotations.Nullable String pendingNote;
+
+	// ---- world reset (the reset key: Skyrim sends Proto.IN_RESET_WORLD) -----------------------
+	// 0 none; 1 asked: Skyrim is told (Proto.MC_RESETTING) and given a few frames to put the player
+	// on its own controls; 2 the world is closed and its saved chunks are being deleted; 3 the world
+	// is opened again and we're waiting for the player to be back in it.
+	private static int resetStage;
+	private static boolean resetClosing;
+	private static int resetFrames;
+	private static int resetTries;
+	private static boolean resetWarned;
+	private static long resetSince;
+	private static @org.jspecify.annotations.Nullable String resetNote;
+	// A chunk's blocks, its dug Skyrim cells (an attachment on the chunk), and the entities and points
+	// of interest around it, are all saved per chunk in folders with these names. Everything else in
+	// the world's folder (the player and their inventory, level.dat, settings) stays.
+	private static final Set<String> CHUNK_FOLDERS = Set.of("region", "entities", "poi");
+	private static final Set<String> KEEP_FOLDERS = Set.of("datapacks", "players", "playerdata", "advancements", "stats", "resources");
 
 	private MirrorWorld() {
 	}
@@ -96,10 +125,183 @@ public final class MirrorWorld {
 
 	/** Every client tick: a note for the player once they're in a world again. */
 	public static void tick(Minecraft minecraft) {
+		tickReset(minecraft);
 		if (pendingNote != null && minecraft.player != null) {
 			minecraft.gui.hud.getChat().addClientSystemMessage(net.minecraft.network.chat.Component.literal(pendingNote));
 			pendingNote = null;
 		}
+	}
+
+	/** Whether a world reset is under way (SkyClient tells Skyrim, which keeps the player on its own controls). */
+	public static boolean resetting() {
+		return resetStage != 0;
+	}
+
+	/** After each frame that went out to Skyrim: it has had a look at {@link #resetting()} by now. */
+	public static void frameShown() {
+		if (resetStage == 1) {
+			resetFrames++;
+		}
+	}
+
+	/**
+	 * The reset key: throw this world's blocks away (everything built, everything dug, everywhere) and
+	 * open it again fresh, with the player and their inventory as they were. Blocks the player built
+	 * stay in the one Minecraft world however far Skyrim has taken them since, so they end up floating
+	 * in the void of another place; this is how to get rid of them.
+	 */
+	public static void requestReset(Minecraft minecraft) {
+		if (resetStage != 0) {
+			return;
+		}
+		var server = minecraft.getSingleplayerServer();
+		if (server == null || minecraft.level == null || minecraft.player == null) {
+			SkyCraft.LOG.info("SkyCraft: world reset asked, but this isn't our own world (a friend's, or none is open); ignoring it");
+			return;
+		}
+		if (server.getPlayerList().getPlayers().size() > 1) {
+			SkyCraft.LOG.info("SkyCraft: world reset asked, but friends are in this world; ignoring it");
+			return;
+		}
+		resetStage = 1;
+		resetClosing = false;
+		resetFrames = 0;
+		resetSince = System.currentTimeMillis();
+		SkyCraft.LOG.info("SkyCraft: world reset asked; giving Skyrim a moment to take the player");
+	}
+
+	private static void tickReset(Minecraft minecraft) {
+		switch (resetStage) {
+			case 1 -> {
+				// A few frames with MC_RESETTING out to Skyrim first: closing the world stalls this
+				// thread for a moment, and Skyrim should already have the player by then.
+				if (!resetClosing && (resetFrames >= 3 || System.currentTimeMillis() - resetSince > 2000)) {
+					resetClosing = true;
+					// Like /join: from Minecraft's task queue, not from inside a tick.
+					minecraft.execute(() -> closeWorldForReset(minecraft));
+				}
+			}
+			case 2 -> deleteSavedChunks(minecraft);
+			case 3 -> {
+				long waited = System.currentTimeMillis() - resetSince;
+				boolean back = minecraft.level != null && minecraft.player != null;
+				if (back && (minecraft.gui.screen() == null || waited > 8000)) {
+					resetStage = 0;
+					pendingNote = resetNote != null ? resetNote : "World reset: everything built or dug is gone.";
+					resetNote = null;
+					SkyCraft.LOG.info("SkyCraft: world reset done");
+				} else if (waited > 120_000) {
+					resetStage = 0;
+					SkyCraft.LOG.warn("SkyCraft: world reset: the world didn't open again in two minutes; giving up waiting");
+				}
+			}
+			default -> {
+			}
+		}
+	}
+
+	private static void closeWorldForReset(Minecraft minecraft) {
+		resetClosing = false;
+		if (resetStage != 1) {
+			return;
+		}
+		resetNote = null;
+		resetWarned = false;
+		resetTries = 0;
+		attempted = true;  // openWhenReady leaves the title screen alone until the saved chunks are gone
+		SkyDig.wallsChanged();  // walls worked out from the old world's dug cells mean nothing now
+		SkyCraft.LOG.info("SkyCraft: world reset: closing the world");
+		minecraft.disconnectFromWorld(net.minecraft.client.multiplayer.ClientLevel.DEFAULT_QUIT_MESSAGE);
+		minecraft.gui.setScreen(new TitleScreen());
+		resetStage = 2;
+		resetSince = System.currentTimeMillis();
+	}
+
+	/** Stage 2, every tick until done: wait for the world's server to let go of its files, then clear the chunks. */
+	private static void deleteSavedChunks(Minecraft minecraft) {
+		if (resetTries++ % 10 != 0) {
+			return;  // twice a second is plenty
+		}
+		long waited = System.currentTimeMillis() - resetSince;
+		Path world = minecraft.gameDirectory.toPath().resolve("saves").resolve(SkyCraft.WORLD_NAME);
+		if (!Files.isDirectory(world)) {
+			SkyCraft.LOG.warn("SkyCraft: world reset: no world folder at {}; nothing to clear", world);
+			resetNote = "Couldn't find the world's folder, so nothing was reset.";
+			reopenAfterReset();
+			return;
+		}
+		if (waited < 60_000 && !worldFree(world)) {
+			return;  // the integrated server is still saving and shutting down
+		}
+		try {
+			int removed = clearChunkFolders(world);
+			SkyCraft.LOG.info("SkyCraft: world reset: removed {} saved chunk files", removed);
+			reopenAfterReset();
+		} catch (IOException e) {
+			if (waited < 60_000) {
+				if (!resetWarned) {
+					resetWarned = true;
+					SkyCraft.LOG.warn("SkyCraft: world reset: couldn't clear the world's chunks yet ({}); trying again", e.toString());
+				}
+				return;
+			}
+			SkyCraft.LOG.error("SkyCraft: world reset: couldn't clear the world's chunks", e);
+			resetNote = "Couldn't reset the world (its files were in use). Close other programs using it and try again.";
+			reopenAfterReset();
+		}
+	}
+
+	private static void reopenAfterReset() {
+		SkyDig.wallsChanged();
+		attempted = false;  // openWhenReady opens the world from the title screen, as at startup
+		resetStage = 3;
+		resetSince = System.currentTimeMillis();
+	}
+
+	/** The world's server holds session.lock until it has finished shutting down. */
+	private static boolean worldFree(Path world) {
+		Path lock = world.resolve("session.lock");
+		if (!Files.exists(lock)) {
+			return true;
+		}
+		try (FileChannel channel = FileChannel.open(lock, StandardOpenOption.WRITE); FileLock held = channel.tryLock()) {
+			return held != null;
+		} catch (OverlappingFileLockException | IOException e) {
+			return false;
+		}
+	}
+
+	/** Empties the region, entities and poi folders anywhere in the world's folder; returns how many files went. */
+	private static int clearChunkFolders(Path world) throws IOException {
+		List<Path> folders;
+		try (Stream<Path> walk = Files.walk(world)) {
+			folders = walk.filter(p -> isChunkFolder(world, p)).toList();
+		}
+		int removed = 0;
+		for (Path folder : folders) {
+			List<Path> inside;
+			try (Stream<Path> walk = Files.walk(folder)) {
+				inside = walk.filter(p -> !p.equals(folder)).sorted(Comparator.reverseOrder()).toList();  // files before their folders
+			}
+			for (Path path : inside) {
+				if (Files.deleteIfExists(path)) {
+					removed++;
+				}
+			}
+		}
+		return removed;
+	}
+
+	private static boolean isChunkFolder(Path world, Path path) {
+		if (path.equals(world) || !Files.isDirectory(path) || !CHUNK_FOLDERS.contains(path.getFileName().toString())) {
+			return false;
+		}
+		for (Path part : world.relativize(path)) {
+			if (KEEP_FOLDERS.contains(part.toString())) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	public static void openWhenReady(Minecraft minecraft) {

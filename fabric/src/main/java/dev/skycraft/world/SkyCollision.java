@@ -62,6 +62,18 @@ public final class SkyCollision {
 		smoothCollider = predicate;
 	}
 
+	// Set around one mob's movement (SkyMobCollider): the voxels are left out of that movement, which
+	// uses the exact triangles instead. Path and space queries from the mob's AI still see the voxels.
+	private static final ThreadLocal<Boolean> SMOOTH_MOVE = ThreadLocal.withInitial(() -> false);
+
+	public static void setSmoothMove(boolean on) {
+		SMOOTH_MOVE.set(on);
+	}
+
+	public static boolean smoothMove() {
+		return SMOOTH_MOVE.get();
+	}
+
 	public static boolean usesSmoothCollider(net.minecraft.world.entity.@Nullable Entity entity) {
 		return entity != null && smoothCollider.test(entity);
 	}

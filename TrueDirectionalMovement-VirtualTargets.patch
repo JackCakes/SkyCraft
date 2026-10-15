@@ -1,0 +1,843 @@
+diff --git a/src/DirectionalMovementHandler.cpp b/src/DirectionalMovementHandler.cpp
+index c7629e1..da2c4c9 100644
+--- a/src/DirectionalMovementHandler.cpp
++++ b/src/DirectionalMovementHandler.cpp
+@@ -4,6 +4,10 @@
+ #include "Offsets.h"
+ #include "Hooks.h"
+ 
++#include <algorithm>
++#include <cstring>
++#include <string>
++
+ #include <Psapi.h>
+ #include <DbgHelp.h>
+ #pragma comment(lib, "dbghelp.lib")
+@@ -235,9 +239,12 @@ void DirectionalMovementHandler::Update()
+ 	}
+ 
+ 	if (IsFreeCamera()) {
+-		if (_target) {
++		if (_target || _virtualTargetId != 0) {
+ 			SetDesiredAngleToTarget(RE::PlayerCharacter::GetSingleton(), _target);
+ 			LookAtTarget(_target);
++			if (_virtualTargetId != 0) {
++				UpdateVirtualTargetBar();
++			}
+ 			if (Settings::glob_directionalMovement) {
+ 				Settings::glob_directionalMovement->value = 0;
+ 			}
+@@ -1103,14 +1110,16 @@ void DirectionalMovementHandler::SetDesiredAngleToTarget(RE::PlayerCharacter* a_
+ 
+ 	auto target = a_target.get();
+ 
+-	if (!target) {
++	RE::NiPoint3 targetPos;
++	if (target) {
++		targetPos = _currentTargetPoint ? _currentTargetPoint->world.translate : target->GetLookingAtLocation();
++	} else if (a_target || !GetVirtualTargetPosition(targetPos)) {  // no actor: only a locked-on virtual target can be faced
+ 		return;
+ 	}
+ 
+ 	RE::NiPoint2 playerPos;
+ 	playerPos.x = a_playerCharacter->GetPositionX();
+ 	playerPos.y = a_playerCharacter->GetPositionY();
+-	RE::NiPoint3 targetPos = _currentTargetPoint ? _currentTargetPoint->world.translate : target->GetLookingAtLocation();
+ 
+ 	RE::NiPoint2 directionToTarget = RE::NiPoint2(-(targetPos.x - playerPos.x), targetPos.y - playerPos.y);
+ 	directionToTarget.Unitize();
+@@ -1285,12 +1294,13 @@ void DirectionalMovementHandler::UpdateRotationLockedCam()
+ 		return;
+ 	}
+ 
+-	if (!_target) {
++	RE::NiPoint3 targetPos;
++	if (_target) {
++		targetPos = _currentTargetPoint ? _currentTargetPoint->world.translate : _target.get()->GetLookingAtLocation();
++	} else if (!GetVirtualTargetPosition(targetPos)) {
+ 		return;
+ 	}
+ 
+-	RE::NiPoint3 targetPos = _currentTargetPoint ? _currentTargetPoint->world.translate : _target.get()->GetLookingAtLocation();
+-
+ 	auto playerCharacter = RE::PlayerCharacter::GetSingleton();
+ 	if (!playerCharacter) {
+ 		return;
+@@ -1487,6 +1497,41 @@ bool DirectionalMovementHandler::ToggleTargetLock(bool bEnable, bool bPressedMan
+ 			actor = FindTarget(bPressedManually ? TargetLockSelectionMode::kCombined : TargetLockSelectionMode::kClosest);
+ 		}
+ 
++		// An actor another mod has asked TDM never to lock on to (SkyCraft's stand-ins for Minecraft's mobs, which are locked on to
++		// as virtual targets instead) is not a target, whichever way it was found (IDRC's, the crosshair's, the closest...).
++		if (actor) {
++			if (const auto picked = actor.get(); picked && IsActorIgnored(picked->GetFormID())) {
++				actor = RE::ActorHandle();
++			}
++		}
++
++		// A virtual target (from another mod) may be the better pick, or the only one
++		{
++			const auto mode = bPressedManually ? TargetLockSelectionMode::kCombined : TargetLockSelectionMode::kClosest;
++			float virtualScore = FLT_MAX;
++			const std::uint32_t virtualId = FindVirtualTarget(mode, virtualScore, false);
++			if (virtualId != 0) {
++				bool bPreferVirtual = !actor;
++				if (actor) {
++					RE::NiPoint3 playerPosition;
++					if (GetTorsoPos(playerCharacter, playerPosition)) {
++						auto actorPoint = GetBestTargetPoint(actor);
++						const RE::NiPoint3 actorPosition = actorPoint ? actorPoint->world.translate : actor.get()->GetLookingAtLocation();
++						bPreferVirtual = virtualScore < ScoreTargetPosition(mode, actorPosition, playerPosition);
++					}
++				}
++				if (bPreferVirtual) {
++					SetVirtualTarget(virtualId);
++
++					playerCharacter->SetGraphVariableBool(GraphVarNames::TDM_TargetLock, true);
++					if (Settings::spel_targetLockSpell) {
++						playerCharacter->AddSpell(Settings::spel_targetLockSpell);
++					}
++					return true;
++				}
++			}
++		}
++
+ 		if (actor) 
+ 		{
+ 			SetTarget(actor);
+@@ -1510,6 +1555,7 @@ bool DirectionalMovementHandler::ToggleTargetLock(bool bEnable, bool bPressedMan
+ 
+ 	if (!bEnable || HasTargetLocked())
+ 	{
++		SetVirtualTarget(0);
+ 		SetTarget(RE::ActorHandle());
+ 
+ 		// Set graph variable
+@@ -1569,12 +1615,16 @@ RE::NiPoint3 DirectionalMovementHandler::GetTargetPosition() const
+ 		return _target.get()->GetLookingAtLocation();
+ 	}
+ 
++	if (RE::NiPoint3 virtualPosition; GetVirtualTargetPosition(virtualPosition)) {
++		return virtualPosition;
++	}
++
+ 	return RE::NiPoint3();
+ }
+ 
+ void DirectionalMovementHandler::ClearTargets()
+ {
+-	if (_target)
++	if (HasTargetLocked())
+ 	{
+ 		ToggleTargetLock(false);
+ 	}
+@@ -1631,6 +1681,10 @@ bool DirectionalMovementHandler::CheckCurrentTarget(RE::ActorHandle a_target, bo
+ 		return false;
+ 	}
+ 
++	if (IsActorIgnored(target->GetFormID())) {
++		return false;
++	}
++
+ 	auto actorState = target->AsActorState();
+ 	auto currentProcess = target->GetActorRuntimeData().currentProcess;
+ 	if (!currentProcess || !currentProcess->InHighProcess() ||
+@@ -1687,7 +1741,7 @@ void DirectionalMovementHandler::UpdateTargetLock()
+ 			ToggleTargetLock(false);
+ 		}
+ 
+-		if (!CheckCurrentTarget(_target))
++		if (_virtualTargetId != 0 ? !CheckVirtualTarget() : !CheckCurrentTarget(_target))
+ 		{
+ 			ToggleTargetLock(false);
+ 		}
+@@ -1712,6 +1766,9 @@ bool DirectionalMovementHandler::IsActorValidTarget(RE::ActorPtr a_actor, bool a
+ 	if (a_actor->formType != RE::FormType::ActorCharacter)
+ 		return false;
+ 
++	if (IsActorIgnored(a_actor->GetFormID()))
++		return false;
++
+ 	if (a_actor->IsDead())
+ 		return false;
+ 
+@@ -1841,6 +1898,11 @@ void DirectionalMovementHandler::SwitchTarget(Direction a_direction)
+ 		return;  // too soon
+ 	}
+ 
++	if (_virtualTargetId != 0) {
++		SwitchVirtualTarget(a_direction);
++		return;
++	}
++
+ 	//RE::ActorHandle actor = GetClosestTarget(FindTargetsByDirection(a_direction), _target);
+ 
+ 	if (SwitchTargetPoint(a_direction)) {
+@@ -2200,6 +2262,18 @@ bool DirectionalMovementHandler::SetDesiredAngleToMagnetismTarget()
+ 
+ void DirectionalMovementHandler::SetTarget(RE::ActorHandle a_target)
+ {
++	// Last line of defence: nothing on the ignored list (SkyCraft's stand-ins) is ever locked on to, by any route.
++	if (a_target) {
++		if (const auto picked = a_target.get(); picked && IsActorIgnored(picked->GetFormID())) {
++			return;
++		}
++	}
++
++	if (a_target && _virtualTargetId != 0) {
++		_virtualTargetId = 0;  // an actor is locked on to instead
++		UpdateVirtualTargetBar();  // (its bar goes)
++	}
++
+ 	if (_target == a_target) {
+ 		return;
+ 	}
+@@ -2231,8 +2305,420 @@ void DirectionalMovementHandler::SetTarget(RE::ActorHandle a_target)
+ 	}
+ }
+ 
++// ---- Virtual targets --------------------------------------------------------------------------------------------------
++// Things to lock on to that are not actors, handed over by another mod (a mob that lives in another game's world and has no Skyrim
++// actor, say). There is nothing to draw a reticle on or to aim a projectile at, so a virtual target gets the camera, the facing and
++// the strafing of a target lock, and nothing else.
++
++static std::int64_t SteadyNowMs()
++{
++	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
++}
++
++bool DirectionalMovementHandler::AreVirtualTargetsFresh() const
++{
++	const std::int64_t stamp = _virtualTargetsStamp;
++	return stamp != 0 && SteadyNowMs() - stamp < 1000;
++}
++
++void DirectionalMovementHandler::SetVirtualTargets(const TDM_API::VirtualTarget* a_targets, std::uint32_t a_count)
++{
++	_virtualTargetsStamp = SteadyNowMs();
++	std::lock_guard<std::mutex> lock(_virtualTargetsMutex);
++	_virtualTargets.clear();
++	for (std::uint32_t i = 0; a_targets && i < a_count; ++i) {
++		if (a_targets[i].id != 0) {
++			_virtualTargets[a_targets[i].id] = a_targets[i];
++		}
++	}
++}
++
++void DirectionalMovementHandler::SetIgnoredActors(const std::uint32_t* a_formIds, std::uint32_t a_count)
++{
++	std::lock_guard<std::mutex> lock(_virtualTargetsMutex);
++	_ignoredActors.clear();
++	for (std::uint32_t i = 0; a_formIds && i < a_count; ++i) {
++		_ignoredActors.insert(static_cast<RE::FormID>(a_formIds[i]));
++	}
++}
++
++bool DirectionalMovementHandler::IsActorIgnored(RE::FormID a_formId) const
++{
++	std::lock_guard<std::mutex> lock(_virtualTargetsMutex);
++	return _ignoredActors.contains(a_formId);
++}
++
++bool DirectionalMovementHandler::GetVirtualTargetPosition(RE::NiPoint3& a_out) const
++{
++	const std::uint32_t id = _virtualTargetId;
++	if (id == 0 || !AreVirtualTargetsFresh()) {
++		return false;
++	}
++	std::lock_guard<std::mutex> lock(_virtualTargetsMutex);
++	const auto it = _virtualTargets.find(id);
++	if (it == _virtualTargets.end()) {
++		return false;
++	}
++	a_out = RE::NiPoint3(it->second.x, it->second.y, it->second.z);
++	return true;
++}
++
++bool DirectionalMovementHandler::CheckVirtualTarget() const
++{
++	auto playerCharacter = RE::PlayerCharacter::GetSingleton();
++	RE::NiPoint3 position;
++	if (!playerCharacter || !GetVirtualTargetPosition(position)) {  // gone: the mod that gave it left it out
++		return false;
++	}
++
++	if (RE::MenuTopicManager::GetSingleton()->speaker) {
++		return false;
++	}
++
++	return playerCharacter->GetPosition().GetDistance(position) <= Settings::fTargetLockDistance * _targetLockDistanceHysteresis;
++}
++
++float DirectionalMovementHandler::ScoreTargetPosition(TargetLockSelectionMode a_mode, const RE::NiPoint3& a_position, const RE::NiPoint3& a_playerPosition) const
++{
++	RE::NiPoint3 direction = a_position - a_playerPosition;
++	const float distance = direction.Unitize();
++	if (a_mode == TargetLockSelectionMode::kClosest) {
++		return distance;
++	}
++
++	auto playerCamera = RE::PlayerCamera::GetSingleton();
++	if (!playerCamera || !playerCamera->currentState) {
++		return distance;
++	}
++	RE::NiQuaternion cameraRotation;
++	playerCamera->currentState->GetRotation(cameraRotation);
++	auto cameraForward = RotateVector(RE::NiPoint3(0.f, 1.f, 0.f), cameraRotation);
++	cameraForward.z = 0.f;
++	cameraForward.Unitize();
++	const float dot = cameraForward.Dot(direction);
++
++	// lower is better, as with the distance
++	return a_mode == TargetLockSelectionMode::kCenter ? -dot : distance * (1.f - dot);
++}
++
++std::uint32_t DirectionalMovementHandler::FindVirtualTarget(TargetLockSelectionMode a_mode, float& a_scoreOut, bool a_bSkipCurrent) const
++{
++	a_scoreOut = FLT_MAX;
++
++	auto playerCharacter = RE::PlayerCharacter::GetSingleton();
++	RE::NiPoint3 playerPosition;
++	if (!AreVirtualTargetsFresh() || !playerCharacter || !GetTorsoPos(playerCharacter, playerPosition)) {
++		return 0;
++	}
++
++	std::uint32_t best = 0;
++	std::lock_guard<std::mutex> lock(_virtualTargetsMutex);
++	for (const auto& entry : _virtualTargets) {
++		if (a_bSkipCurrent && entry.first == _virtualTargetId) {
++			continue;
++		}
++		const RE::NiPoint3 position(entry.second.x, entry.second.y, entry.second.z);
++		if (playerPosition.GetDistance(position) > Settings::fTargetLockDistance) {
++			continue;
++		}
++		const float score = ScoreTargetPosition(a_mode, position, playerPosition);
++		if (score < a_scoreOut) {
++			a_scoreOut = score;
++			best = entry.first;
++		}
++	}
++	return best;
++}
++
++void DirectionalMovementHandler::SetVirtualTarget(std::uint32_t a_id)
++{
++	if (_virtualTargetId == a_id) {
++		return;
++	}
++
++	if (a_id != 0 && _target) {
++		SetTarget(RE::ActorHandle());  // an actor was locked on to: let it go (its reticle, health bar and headtracking too)
++	}
++
++	_virtualTargetId = a_id;
++
++	if (a_id != 0) {
++		SetTargetPoint(RE::NiPointer<RE::NiAVObject>());
++		SetHeadtrackTarget(RE::HighProcessData::HEAD_TRACK_TYPE::kDialogue, nullptr);
++		RemoveTargetLockReticle();
++	}
++
++	UpdateVirtualTargetBar();  // TrueHUD's name and health bar: the stand-in's while locked on, none once it isn't
++}
++
++// The name and health bar of the virtual target locked on to. There is no actor, so TrueHUD cannot give it one; it is drawn
++// straight into Skyrim's HUD with ActionScript's drawing calls, above the target, as a bar and a name like an NPC's. All of it
++// happens on the UI thread, and a HUD that is not there (or does not answer) just means no bar.
++namespace
++{
++	constexpr double kVirtualBarWidth = 130.0;   // stage units, for a 720 high stage; the clip is scaled to the real one
++	constexpr double kVirtualBarHeight = 9.0;
++
++	struct VirtualBarUi
++	{
++		const void*  movie = nullptr;
++		RE::GFxValue container;
++		RE::GFxValue fill;
++		RE::GFxValue text;
++		std::string  shownName;
++		bool         ready = false;
++	};
++	VirtualBarUi* virtualBarUi = nullptr;  // never freed: its movie may be gone by then
++
++	void DrawBarRect(RE::GFxValue& a_clip, double a_x0, double a_y0, double a_x1, double a_y1, double a_color, double a_alpha)
++	{
++		RE::GFxValue a[2];
++		a[0].SetNumber(a_color);
++		a[1].SetNumber(a_alpha);
++		a_clip.Invoke("beginFill", nullptr, a, 2);
++		RE::GFxValue p[2];
++		const double xs[5] = { a_x0, a_x1, a_x1, a_x0, a_x0 };
++		const double ys[5] = { a_y0, a_y0, a_y1, a_y1, a_y0 };
++		for (int i = 0; i < 5; ++i) {
++			p[0].SetNumber(xs[i]);
++			p[1].SetNumber(ys[i]);
++			a_clip.Invoke(i == 0 ? "moveTo" : "lineTo", nullptr, p, 2);
++		}
++		a_clip.Invoke("endFill", nullptr, nullptr, 0);
++	}
++
++	std::string EscapeHtml(const std::string& a_text)
++	{
++		std::string out;
++		for (const char c : a_text) {
++			switch (c) {
++			case '&': out += "&amp;"; break;
++			case '<': out += "&lt;"; break;
++			case '>': out += "&gt;"; break;
++			default: out += c; break;
++			}
++		}
++		return out;
++	}
++}
++
++void DirectionalMovementHandler::UpdateVirtualTargetBar()
++{
++	bool          show = false;
++	std::string   name;
++	float         health = -1.0f;
++	RE::NiPoint3  position;
++	if (_virtualTargetId != 0 && AreVirtualTargetsFresh()) {
++		std::lock_guard<std::mutex> lock(_virtualTargetsMutex);
++		if (const auto it = _virtualTargets.find(_virtualTargetId); it != _virtualTargets.end()) {
++			show = true;
++			name.assign(it->second.name, strnlen(it->second.name, sizeof(it->second.name)));
++			health = it->second.health;
++			position = RE::NiPoint3(it->second.x, it->second.y, it->second.z);
++		}
++	}
++
++	static bool shownLast = false;
++	if (!show && !shownLast) {
++		return;  // nothing was shown, nothing is
++	}
++	shownLast = show;
++
++	const auto* tasks = SKSE::GetTaskInterface();
++	if (!tasks) {
++		return;
++	}
++	tasks->AddUITask([show, name, health, position]() {
++		auto* ui = RE::UI::GetSingleton();
++		auto  hud = ui ? ui->GetMenu(RE::HUDMenu::MENU_NAME) : RE::GPtr<RE::IMenu>();
++		if (!hud || !hud->uiMovie) {
++			return;
++		}
++		RE::GFxMovieView* movie = hud->uiMovie.get();
++		if (!virtualBarUi || virtualBarUi->movie != movie) {
++			virtualBarUi = new VirtualBarUi();
++			virtualBarUi->movie = movie;
++		}
++		VirtualBarUi& bar = *virtualBarUi;
++
++		if (!bar.ready) {
++			if (!show) {
++				return;
++			}
++			RE::GFxValue root;
++			if (!movie->GetVariable(&root, "_root") || !root.IsObject()) {
++				return;
++			}
++			RE::GFxValue depth;
++			root.Invoke("getNextHighestDepth", &depth, nullptr, 0);
++			RE::GFxValue args[6];
++			args[0].SetString("tdm_virtualTargetBar");
++			args[1].SetNumber(depth.IsNumber() ? depth.GetNumber() : 9000.0);
++			root.Invoke("createEmptyMovieClip", &bar.container, args, 2);
++			if (!bar.container.IsObject()) {
++				return;
++			}
++			RE::GFxValue back;
++			args[0].SetString("back");
++			args[1].SetNumber(1);
++			bar.container.Invoke("createEmptyMovieClip", &back, args, 2);
++			DrawBarRect(back, -kVirtualBarWidth * 0.5, 0.0, kVirtualBarWidth * 0.5, kVirtualBarHeight, 0x000000, 60.0);
++			args[0].SetString("fill");
++			args[1].SetNumber(2);
++			bar.container.Invoke("createEmptyMovieClip", &bar.fill, args, 2);
++			args[0].SetString("name");
++			args[1].SetNumber(3);
++			args[2].SetNumber(-kVirtualBarWidth);
++			args[3].SetNumber(-26.0);
++			args[4].SetNumber(kVirtualBarWidth * 2.0);
++			args[5].SetNumber(24.0);
++			bar.container.Invoke("createTextField", &bar.text, args, 6);
++			RE::GFxValue flag;
++			flag.SetBoolean(true);
++			bar.text.SetMember("html", flag);
++			flag.SetBoolean(false);
++			bar.text.SetMember("selectable", flag);
++			bar.ready = true;
++		}
++
++		RE::GFxValue::DisplayInfo info;
++		if (!show) {
++			info.SetVisible(false);
++			bar.container.SetDisplayInfo(info);
++			return;
++		}
++
++		float nx = 0.0f, ny = 0.0f, depthZ = 0.0f;
++		RE::NiCamera::WorldPtToScreenPt3((float(*)[4])g_worldToCamMatrix, *g_viewPort, position, nx, ny, depthZ, 1e-5f);
++		if (depthZ < 0.0f) {  // behind the camera
++			info.SetVisible(false);
++			bar.container.SetDisplayInfo(info);
++			return;
++		}
++		ny = 1.0f - ny;  // Flash's y goes down
++
++		const RE::GRectF rect = movie->GetVisibleFrameRect();
++		const float      stageWidth = rect.right - rect.left;
++		const float      stageHeight = rect.bottom - rect.top;
++		const double     scale = stageHeight / 720.0 * 100.0;
++		const float      half = static_cast<float>(kVirtualBarWidth * 0.5 * scale / 100.0);
++		float            x = rect.left + stageWidth * nx;
++		float            y = rect.top + stageHeight * ny - stageHeight * 0.10f;  // above the target
++		x = std::clamp(x, rect.left + half, rect.right - half);
++		y = std::clamp(y, rect.top + stageHeight * 0.06f, rect.bottom - stageHeight * 0.06f);
++
++		bar.fill.Invoke("clear", nullptr, nullptr, 0);
++		if (health >= 0.0f) {
++			const double fraction = std::clamp(static_cast<double>(health), 0.0, 1.0);
++			if (fraction > 0.0) {
++				DrawBarRect(bar.fill, -kVirtualBarWidth * 0.5, 0.0, -kVirtualBarWidth * 0.5 + kVirtualBarWidth * fraction, kVirtualBarHeight, 0xB02020, 100.0);
++			}
++		}
++
++		if (name != bar.shownName) {
++			bar.shownName = name;
++			const std::string html = "<font face=\"$EverywhereFont\" size=\"18\" color=\"#FFFFFF\"><p align=\"center\">" + EscapeHtml(name) + "</p></font>";
++			RE::GFxValue text;
++			text.SetString(html.c_str());
++			bar.text.SetMember("htmlText", text);
++		}
++
++		info.SetVisible(true);
++		info.SetPosition(x, y);
++		info.SetScale(scale, scale);
++		bar.container.SetDisplayInfo(info);
++	});
++}
++
++void DirectionalMovementHandler::SwitchVirtualTarget(Direction a_direction)
++{
++	auto playerCharacter = RE::PlayerCharacter::GetSingleton();
++	RE::NiPoint3 playerPosition;
++	RE::NiPoint3 currentPosition;
++	if (!AreVirtualTargetsFresh() || !playerCharacter || !GetTorsoPos(playerCharacter, playerPosition) || !GetVirtualTargetPosition(currentPosition)) {
++		return;
++	}
++
++	RE::NiPoint2 currentScreenPosition;
++	float currentDepth;
++	RE::NiCamera::WorldPtToScreenPt3((float(*)[4])g_worldToCamMatrix, *g_viewPort, currentPosition, currentScreenPosition.x, currentScreenPosition.y, currentDepth, 1e-5f);
++
++	constexpr RE::NiPoint2 upVector{ 0.f, 1.f };
++	constexpr RE::NiPoint2 downVector{ 0.f, -1.f };
++	constexpr RE::NiPoint2 leftVector{ -1.f, 0.f };
++	constexpr RE::NiPoint2 rightVector{ 1.f, 0.f };
++
++	std::uint32_t best = 0;
++	float bestScreenDistance = FLT_MAX;
++	{
++		std::lock_guard<std::mutex> lock(_virtualTargetsMutex);
++		for (const auto& entry : _virtualTargets) {
++			if (entry.first == _virtualTargetId) {
++				continue;
++			}
++			const RE::NiPoint3 position(entry.second.x, entry.second.y, entry.second.z);
++			if (playerPosition.GetDistance(position) > Settings::fTargetLockDistance) {
++				continue;
++			}
++
++			RE::NiPoint2 newScreenPosition;
++			float newDepth;
++			RE::NiCamera::WorldPtToScreenPt3((float(*)[4])g_worldToCamMatrix, *g_viewPort, position, newScreenPosition.x, newScreenPosition.y, newDepth, 1e-5f);
++			if (newDepth < 0.f) {  // offscreen
++				continue;
++			}
++
++			bool bIsCorrectDirection = false;
++			RE::NiPoint2 directionVector;
++			switch (a_direction) {
++			case Direction::kLeft:
++				bIsCorrectDirection = newScreenPosition.x < currentScreenPosition.x;
++				directionVector = leftVector;
++				break;
++			case Direction::kRight:
++				bIsCorrectDirection = newScreenPosition.x > currentScreenPosition.x;
++				directionVector = rightVector;
++				break;
++			case Direction::kForward:
++			case Direction::kUp:
++				bIsCorrectDirection = newScreenPosition.y > currentScreenPosition.y;
++				directionVector = upVector;
++				break;
++			case Direction::kBack:
++			case Direction::kDown:
++				bIsCorrectDirection = newScreenPosition.y < currentScreenPosition.y;
++				directionVector = downVector;
++				break;
++			}
++
++			if (bIsCorrectDirection) {
++				RE::NiPoint2 distanceVector = newScreenPosition - currentScreenPosition;
++				const float screenDistance = distanceVector.Unitize();
++				const float directionMult = 2.f - directionVector.Dot(distanceVector);
++				if (screenDistance * directionMult < bestScreenDistance) {
++					bestScreenDistance = screenDistance * directionMult;
++					best = entry.first;
++				}
++			}
++		}
++	}
++
++	if (best != 0) {
++		SetVirtualTarget(best);
++		_lastTargetSwitchDirection = a_direction;
++		_lastTargetSwitchTimer = 0.25f;
++	}
++}
++
+ void DirectionalMovementHandler::SetSoftTarget(RE::ActorHandle a_softTarget)
+ {
++	// SkyCraft's stand-ins are never a soft target either (crosshair, enemy health bar, magnetism): no bar, no head tracking.
++	if (a_softTarget) {
++		if (const auto picked = a_softTarget.get(); picked && IsActorIgnored(picked->GetFormID())) {
++			a_softTarget = RE::ActorHandle();
++		}
++	}
++
+ 	if (a_softTarget == _softTarget) {
+ 		return;
+ 	}
+@@ -2667,12 +3153,15 @@ void DirectionalMovementHandler::LookAtTarget(RE::ActorHandle a_target)
+ 		return;
+ 	}
+ 
+-	if (!_currentTargetPoint && !a_target) {
++	RE::NiPoint3 targetPos;
++	if (_currentTargetPoint) {
++		targetPos = _currentTargetPoint->world.translate;
++	} else if (a_target) {
++		targetPos = _target.get()->GetLookingAtLocation();
++	} else if (!GetVirtualTargetPosition(targetPos)) {
+ 		return;
+ 	}
+ 
+-	RE::NiPoint3 targetPos = _currentTargetPoint ? _currentTargetPoint->world.translate : _target.get()->GetLookingAtLocation();
+-
+ 	auto playerCharacter = RE::PlayerCharacter::GetSingleton();
+ 	auto playerCamera = RE::PlayerCamera::GetSingleton();
+ 	RE::ThirdPersonState* thirdPersonState = nullptr;
+@@ -2941,6 +3430,11 @@ void DirectionalMovementHandler::OnPreLoadGame()
+ 	_bJustDodged_Legacy = false;
+ 	_attackState = AttackState::kNone;
+ 	_target = RE::ActorHandle();
++	_virtualTargetId = 0;
++	{
++		std::lock_guard<std::mutex> lock(_virtualTargetsMutex);
++		_virtualTargets.clear();
++	}
+ 	_softTarget = RE::ActorHandle();
+ 	_dialogueSpeaker = RE::ObjectRefHandle();
+ 	_playerIsNPC = false;
+diff --git a/src/DirectionalMovementHandler.h b/src/DirectionalMovementHandler.h
+index a1c94b6..da307d8 100644
+--- a/src/DirectionalMovementHandler.h
++++ b/src/DirectionalMovementHandler.h
+@@ -3,6 +3,10 @@
+ #include "API/APIManager.h"
+ #include "Widgets/TargetLockReticle.h"
+ #include <unordered_set>
++#include <unordered_map>
++#include <mutex>
++#include <atomic>
++#include "TrueDirectionalMovementAPI.h"
+ 
+ namespace std
+ {
+@@ -149,6 +153,15 @@ public:
+ 
+ 	RE::ActorHandle FindTarget(TargetLockSelectionMode a_mode, bool a_bSkipCurrent = true);
+ 	void SwitchTarget(Direction a_direction);
++
++	// Virtual targets: things to lock on to that aren't actors, handed over by another mod through the API (see TrueDirectionalMovementAPI.h)
++	void          SetVirtualTargets(const TDM_API::VirtualTarget* a_targets, std::uint32_t a_count);
++	void          SetIgnoredActors(const std::uint32_t* a_formIds, std::uint32_t a_count);
++	std::uint32_t GetVirtualTargetId() const { return _virtualTargetId; }
++	bool          GetVirtualTargetPosition(RE::NiPoint3& a_out) const;
++	bool          IsActorIgnored(RE::FormID a_formId) const;
++	bool          AreVirtualTargetsFresh() const;
++	void          UpdateVirtualTargetBar();
+ 	bool SwitchTargetPoint(Direction a_direction);
+ 	RE::ActorHandle SwitchScreenTarget(Direction a_direction);
+ 	std::vector<RE::NiPointer<RE::NiAVObject>> GetTargetPoints(RE::ActorHandle a_actorHandle) const;
+@@ -160,6 +173,11 @@ public:
+ 	void SetDesiredSwimmingPitchOffset(float a_value) { _desiredSwimmingPitchOffset = a_value; }
+ 
+ 	void SetTarget(RE::ActorHandle a_target);
++	void SetVirtualTarget(std::uint32_t a_id);
++	bool CheckVirtualTarget() const;
++	float ScoreTargetPosition(TargetLockSelectionMode a_mode, const RE::NiPoint3& a_position, const RE::NiPoint3& a_playerPosition) const;
++	std::uint32_t FindVirtualTarget(TargetLockSelectionMode a_mode, float& a_scoreOut, bool a_bSkipCurrent) const;
++	void SwitchVirtualTarget(Direction a_direction);
+ 	void SetSoftTarget(RE::ActorHandle a_softTarget);
+ 	void SetTargetPoint(RE::NiPointer<RE::NiAVObject> a_targetPoint) { _currentTargetPoint = a_targetPoint; }
+ 
+@@ -202,7 +220,7 @@ public:
+ 	bool ShouldFaceTarget() const { return _bShouldFaceTarget; }
+ 	bool ShouldFaceCrosshair() const { return _bShouldFaceCrosshair; }
+ 
+-	bool HasTargetLocked() const { return static_cast<bool>(_target); }
++	bool HasTargetLocked() const { return static_cast<bool>(_target) || _virtualTargetId != 0; }
+ 
+ 	bool IsTargetLockBehindTarget() const { return HasTargetLocked() && _moveCameraBehindTarget && !_isBehind; }
+ 
+@@ -359,6 +377,11 @@ private:
+ 	float _controlledYawRotationSpeedMultiplier = 0;
+ 
+ 	RE::ActorHandle _target;
++	std::atomic<std::int64_t> _virtualTargetsStamp{ 0 };  // when the virtual targets were last handed over (steady clock, ms): they are only good for a second
++	std::atomic<std::uint32_t> _virtualTargetId{ 0 };  // the virtual target locked on to, if there is one (then _target is empty)
++	std::unordered_map<std::uint32_t, TDM_API::VirtualTarget> _virtualTargets;
++	std::unordered_set<RE::FormID> _ignoredActors;
++	mutable std::mutex _virtualTargetsMutex;
+ 	RE::ActorHandle _softTarget;
+ 	RE::ObjectRefHandle _dialogueSpeaker;
+ 	RE::NiPointer<RE::NiAVObject> _currentTargetPoint;
+diff --git a/src/ModAPI.cpp b/src/ModAPI.cpp
+index d0e2275..b6335bb 100644
+--- a/src/ModAPI.cpp
++++ b/src/ModAPI.cpp
+@@ -275,3 +275,27 @@ bool Messaging::TDMInterface::IsYawControlTaken() const noexcept
+ {
+ 	return yawOwner.load(std::memory_order::memory_order_acquire) != SKSE::kInvalidPluginHandle;
+ }
++
++Messaging::APIResult Messaging::TDMInterface::SetVirtualTargets(SKSE::PluginHandle, const TDM_API::VirtualTarget* a_targets, uint32_t a_count) noexcept
++{
++	if (auto directionalMovementHandler = DirectionalMovementHandler::GetSingleton()) {
++		directionalMovementHandler->SetVirtualTargets(a_targets, a_targets ? a_count : 0);
++	}
++	return APIResult::OK;
++}
++
++Messaging::APIResult Messaging::TDMInterface::SetIgnoredActors(SKSE::PluginHandle, const uint32_t* a_formIds, uint32_t a_count) noexcept
++{
++	if (auto directionalMovementHandler = DirectionalMovementHandler::GetSingleton()) {
++		directionalMovementHandler->SetIgnoredActors(a_formIds, a_formIds ? a_count : 0);
++	}
++	return APIResult::OK;
++}
++
++uint32_t Messaging::TDMInterface::GetCurrentVirtualTarget() const noexcept
++{
++	if (auto directionalMovementHandler = DirectionalMovementHandler::GetSingleton()) {
++		return directionalMovementHandler->GetVirtualTargetId();
++	}
++	return 0;
++}
+diff --git a/src/ModAPI.h b/src/ModAPI.h
+index e8333da..284f9bd 100644
+--- a/src/ModAPI.h
++++ b/src/ModAPI.h
+@@ -11,8 +11,9 @@ namespace Messaging
+ 	using InterfaceVersion3 = ::TDM_API::IVTDM3;
+ 	using InterfaceVersion4 = ::TDM_API::IVTDM4;
+ 	using InterfaceVersion5 = ::TDM_API::IVTDM5;
++	using InterfaceVersion6 = ::TDM_API::IVTDM6;
+ 
+-	class TDMInterface : public InterfaceVersion5
++	class TDMInterface : public InterfaceVersion6
+ 	{
+ 	private:
+ 		TDMInterface() noexcept;
+@@ -54,6 +55,11 @@ namespace Messaging
+ 		virtual SKSE::PluginHandle GetDisableTargetLockOwner() const noexcept override;
+ 		virtual APIResult ReleaseDisableTargetLock(SKSE::PluginHandle a_modHandle) noexcept override;
+ 
++		// InterfaceVersion6
++		virtual APIResult SetVirtualTargets(SKSE::PluginHandle a_modHandle, const TDM_API::VirtualTarget* a_targets, uint32_t a_count) noexcept override;
++		virtual APIResult SetIgnoredActors(SKSE::PluginHandle a_modHandle, const uint32_t* a_formIds, uint32_t a_count) noexcept override;
++		virtual uint32_t GetCurrentVirtualTarget() const noexcept override;
++
+ 		// Internal
+ 		// Mark directional movement control as required by True Directional Movement for API requests
+ 		void SetNeedsDirectionalMovementControl(bool a_needsControl) noexcept;
+diff --git a/src/TrueDirectionalMovementAPI.h b/src/TrueDirectionalMovementAPI.h
+index 15db4d2..5555ec4 100644
+--- a/src/TrueDirectionalMovementAPI.h
++++ b/src/TrueDirectionalMovementAPI.h
+@@ -19,7 +19,8 @@
+ 		V2,
+ 		V3,
+ 		V4,
+-		V5
++		V5,
++		V6
+ 	};
+ 
+ 	// Error types that may be returned by the True Directional Movement API
+@@ -215,6 +216,46 @@
+ 		virtual PluginHandle GetDisableTargetLockOwner() const noexcept = 0;
+ 	};
+ 
++	// A target another mod wants the player to be able to lock on to, though there is no actor behind it (a mob from another game's
++	// world, say). The position is the point to look at and to keep the camera on: the middle of the body.
++	struct VirtualTarget
++	{
++		uint32_t id;  // not 0; stays the same for as long as the target exists
++		float    x, y, z;  // world position, in Skyrim's units
++		float    health;  // 0..1 of its full health, or less than 0 if not known: the bar shown for it while it is locked on to
++		char     name[32];  // its name (zero-ended), shown above that bar; empty for none
++	};
++
++	class IVTDM6 : public IVTDM5
++	{
++	public:
++		/// <summary>
++		/// Replace the whole set of virtual targets. Call it again whenever they move (every frame is fine); a target that is left out of
++		/// the call is gone, and if it was locked on to, the lock is dropped. Target lock picks among them and the actors in the game.
++		/// </summary>
++		/// <param name="a_myPluginHandle">Your assigned plugin handle</param>
++		/// <param name="a_targets">The targets (may be null if a_count is 0)</param>
++		/// <param name="a_count">How many</param>
++		/// <returns>OK</returns>
++		virtual APIResult SetVirtualTargets(PluginHandle a_myPluginHandle, const VirtualTarget* a_targets, uint32_t a_count) noexcept = 0;
++
++		/// <summary>
++		/// Replace the set of actors target lock must never pick (the stand-ins you made for something that is locked on to by way of a virtual target).
++		/// An actor that is locked on to and then listed is let go.
++		/// </summary>
++		/// <param name="a_myPluginHandle">Your assigned plugin handle</param>
++		/// <param name="a_formIds">Their form ids (may be null if a_count is 0)</param>
++		/// <param name="a_count">How many</param>
++		/// <returns>OK</returns>
++		virtual APIResult SetIgnoredActors(PluginHandle a_myPluginHandle, const uint32_t* a_formIds, uint32_t a_count) noexcept = 0;
++
++		/// <summary>
++		/// The id of the virtual target that is locked on to now.
++		/// </summary>
++		/// <returns>The id, or 0 if none</returns>
++		[[nodiscard]] virtual uint32_t GetCurrentVirtualTarget() const noexcept = 0;
++	};
++
+ 	typedef void* (*_RequestPluginAPI)(const InterfaceVersion interfaceVersion);
+ 
+ 	/// <summary>
+diff --git a/src/main.cpp b/src/main.cpp
+index 54ddfb4..badbd59 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -141,6 +141,8 @@ extern "C" DLLEXPORT void* SKSEAPI RequestPluginAPI(const TDM_API::InterfaceVers
+ 	case TDM_API::InterfaceVersion::V4:
+ 		[[fallthrough]];
+ 	case TDM_API::InterfaceVersion::V5:
++		[[fallthrough]];
++	case TDM_API::InterfaceVersion::V6:
+ 		logger::info("TrueDirectionalMovement::RequestPluginAPI returned the API singleton");
+ 		return static_cast<void*>(api);
+ 	}

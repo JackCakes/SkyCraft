@@ -38,12 +38,12 @@ public abstract class BlockCollisionsMixin {
 				blockShape = blockShape.isEmpty() ? wall : Shapes.or(blockShape, wall);
 			}
 		}
-		if (context instanceof EntityCollisionContext entityContext && SkyCollision.usesSmoothCollider(entityContext.getEntity())) {
-			return blockShape; // this entity collides with Skyrim's exact triangles instead (SkyCollider)
-		}
 		VoxelShape sky = SkyCollision.shapeAt(pos);
 		if (sky == null) {
 			return blockShape;
+		}
+		if (SkyCollision.smoothMove() || (context instanceof EntityCollisionContext entityContext && SkyCollision.usesSmoothCollider(entityContext.getEntity()))) {
+			return blockShape; // this entity collides with Skyrim's exact triangles instead (SkyCollider, SkyMobCollider)
 		}
 		return blockShape.isEmpty() ? sky : Shapes.or(blockShape, sky);
 	}

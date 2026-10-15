@@ -13,7 +13,7 @@
 namespace skycraft::proto
 {
 	inline constexpr std::uint32_t kMagic = 0x43594B53;  // "SKYC"
-	inline constexpr std::uint32_t kVersion = 11;
+	inline constexpr std::uint32_t kVersion = 17;
 	inline constexpr wchar_t       kMappingName[] = L"Local\\SkyCraft_v1";
 
 	// 1 Minecraft block == 70 Skyrim units (Skyrim player ~128 units tall, MC player 1.8 blocks).
@@ -59,6 +59,10 @@ namespace skycraft::proto
 		kSkyInGame = 1u << 0,    // a save is loaded and the player exists
 		kSkyMenuOpen = 1u << 1,  // a Skyrim menu owns input; MC should drop held keys
 		kSkyLoading = 1u << 2,   // loading screen / cell transition in progress
+		kSkySettlement = 1u << 4,  // the player is in a town, city, village, farm, inn, fort or other place people live: no mobs spawn
+		                           // (the keywords of the player's current location, or of the location it is part of)
+		kSkyrimControl = 1u << 3,  // the player switched to Skyrim's own controls: MC gets no input,
+		                           // draws no HUD, and its player rides along with Skyrim's (pos below)
 	};
 
 	// Skyrim's water (lakes, rivers, the sea) around the player, for Minecraft to treat as its own
@@ -86,8 +90,9 @@ namespace skycraft::proto
 		std::uint32_t teleportSeq;       // MC teleports its player to pos when this changes
 		std::uint32_t viewportW, viewportH;
 		float         gameHour;
+		float         healthFrac;        // the Skyrim player's health, 0..1 (Minecraft's player shows it in Skyrim's control mode)
 	};
-	static_assert(sizeof(SkyState) == 0x40);
+	static_assert(sizeof(SkyState) == 0x48);
 
 	// ---- MC -> Skyrim state @0x200 (seqlock) ------------------------------------------------
 	enum McFlags : std::uint32_t
@@ -100,6 +105,8 @@ namespace skycraft::proto
 		kMcDead = 1u << 5,
 		kMcSwimming = 1u << 6,
 		kMcFlying = 1u << 7,
+		kMcResetting = 1u << 8,  // MC is throwing its world away and loading a fresh one (kInResetWorld); Skyrim
+		                         // keeps the player on its own controls until this clears and MC is in a world again
 	};
 
 	struct McState
@@ -179,7 +186,13 @@ namespace skycraft::proto
 		kInText = 5,         // a = unicode code point
 		kInReleaseAll = 6,   // release every held key/button (input focus left MC)
 		kInHurt = 7,         // Skyrim hit the player: code = HurtKind, a = Skyrim damage * 100, b = attacker FormID, c = HurtFlags
+		kInResourceTransfer = 12,  // JackCakes resource bridge (request / hashed item / count)
 		kInOpenMenu = 8,     // open Minecraft's pause/options menu
+		kInResetWorld = 9,   // throw Minecraft's world away (every block built or dug) and load a fresh one
+		kInProxyHurt = 11,   // Skyrim hurt the invisible stand-in of a Minecraft mob: a = Skyrim damage * 100, b = the mob's entity id,
+		                     // code bit 0 = the player did it (a spell, a Skyrim weapon), not an NPC
+		kInSkyrimSwing = 10, // Skyrim's player swung or shot in Skyrim's own controls: code = SwingKind | (charge % << 8),
+		                     // a = Skyrim damage * 100, b = yaw * 100, c = pitch * 100 (Minecraft's angles). Minecraft hits the mobs in front
 	};
 
 	enum HurtKind : std::uint16_t
@@ -206,6 +219,12 @@ namespace skycraft::proto
 		kActorDead = 1u << 1,
 		kActorEssential = 1u << 2,
 		kActorInCombat = 1u << 3,
+		kActorFighter = 1u << 4,    // has a fighting streak (Aggression above 0), not a civilian who flees
+		kActorBow = 1u << 5,        // holds a bow or crossbow
+		kActorWeaponDrawn = 1u << 6,  // its weapon is out
+		kActorPerson = 1u << 7,       // a person (ActorTypeNPC), not an animal or creature
+		// Bits 8 to 15: Skyrim's damage for the weapon in its hand (fists when none), 0 to 255.
+		kActorDamageShift = 8,
 	};
 
 	struct ActorRecord
@@ -242,11 +261,45 @@ namespace skycraft::proto
 	{
 		kEvHitActor = 1,    // formId, a = MC damage (after MC's own modifiers), b/c = knockback dir x/z (MC), d = knockback strength
 		kEvPlayerDied = 2,  // the Minecraft player died: kill the Skyrim player
-		kEvExplosion = 3,   // a Minecraft explosion (TNT, creeper, ...): a/b/c = centre (MC coords), d = radius (blocks)
+		kEvExplosion = 3,   // a Minecraft explosion (TNT, creeper, ...): a/b/c = centre (MC coords), d = radius (blocks), flags bit 0 = a creeper's (Skyrim's people are spared it)
 		kEvArrowStuck = 4,  // an arrow stuck in a Skyrim actor: formId, a/b/c = where it hit (MC coords), d = flight yaw,
 		                    // flags = flight pitch (float bits), weapon = arrow texture (0 plain, 1 tipped, 2 spectral)
 		kEvSkillUse = 5,    // the player used a Skyrim skill in Minecraft: formId = Skyrim skill (ActorValue: 9 Block,
 		                    // 10 Smithing, 11 Heavy Armor, 12 Light Armor), a = uses (as Skyrim's AdvanceSkill counts them)
+		kEvNpcSwing = 6,    // a Skyrim NPC swings at a Minecraft mob: formId = the NPC, a/b/c = the mob's position (MC coords).
+		                    // Skyrim turns the NPC to face it and plays its attack; the damage is Minecraft's
+		kEvMobProxy = 8,    // a Minecraft mob near Skyrim's NPCs or near the player: formId = the mob's entity id, a/b/c = its position (MC coords), d = yaw.
+		                    // Skyrim keeps an invisible stand-in actor there: for NPCs to fight, and for the player to lock on to and hit with spells.
+		                    // flags = MobProxyFlags (bit 0: the mob is gone, remove it; bit 1: target only, NPCs are not sent against it)
+		                    // weapon = the mob's height in blocks (a float's bits; 0: not told): the stand-in is sized to it, so its head is the mob's
+		kEvMobName = 9,     // the name of a mob that has a stand-in: formId = the mob's entity id; the 24 bytes of a, b, c, d, flags, weapon
+		                    // (in that order) are its name as ASCII, padded with zeros. Skyrim gives the stand-in that name
+		kEvPlayerHurt = 10, // in Skyrim's control mode, a Minecraft mob hurt the Minecraft player that rides along: a = Minecraft damage (hearts*2),
+		                    // b/c = the way the blow pushed (MC x, z), formId = the attacking mob's entity id + 1 (0: unknown). flags may have kHitProjectile (a shot, not a blow). Skyrim hurts its own player
+		kEvPlayerHealth = 11, // Skyrim's control mode has just begun: a = Minecraft's player health, 0..1. Skyrim's player takes it over
+		kEvMobVitals = 12,  // the live state of a mob that has a stand-in, sent with every kEvMobProxy: formId = the mob's entity id, a = its health,
+		                    // b = its max health (Skyrim's health bar for the stand-in is then exactly the mob's, 1:1), c = its eye height in blocks above its feet
+		                    // (the stand-in's head is put there), flags / weapon = its velocity x / z in blocks per second (float bits), so the stand-in glides
+		                    // with the mob between reports instead of stepping
+		                    // d = the mob's body width in blocks (its height comes with kEvMobProxy): MobBodies.cpp makes the stand-in's collision box from the two
+		kEvNpcStance = 7,   // a Skyrim NPC readies for a fight with Minecraft mobs or stands down: formId = the NPC, a/b/c = the threat's
+		                    // position (MC coords), d = 1 weapon out and facing it, 0 weapon away. Skyrim draws or sheathes it
+		kEvResourceTransferAck = 13,  // JackCakes resource bridge response
+	};
+
+	// What a kInSkyrimSwing was: a melee swing, a power attack, or a bow/crossbow shot (the charge is in the code's high byte).
+	enum SwingKind : std::uint16_t
+	{
+		kSwingMelee = 1,
+		kSwingPower = 2,
+		kSwingArrow = 3,
+	};
+
+	// kEvMobProxy's flags.
+	enum MobProxyFlags : std::uint32_t
+	{
+		kMobProxyGone = 1u << 0,        // the mob is gone: Skyrim puts its stand-in away
+		kMobProxyTargetOnly = 1u << 1,  // for lock-on and spells only: Skyrim's NPCs are not put into combat with it
 	};
 
 	enum HitFlags : std::uint32_t
@@ -255,6 +308,7 @@ namespace skycraft::proto
 		kHitProjectile = 1u << 1,
 		kHitSweep = 1u << 2,
 		kHitFire = 1u << 3,
+		kHitFromMob = 1u << 4,  // a Minecraft mob did it, not the player: no one is the attacker in Skyrim
 	};
 
 	// What landed a kEvHitActor (Skyrim plays that weapon class's impact effect and sounds).
@@ -274,7 +328,7 @@ namespace skycraft::proto
 		std::uint32_t formId;
 		float         a, b, c, d;
 		std::uint32_t flags;
-		std::uint32_t weapon;  // HitWeapon for kEvHitActor
+		std::uint32_t weapon;  // HitWeapon for kEvHitActor (low byte); for a kHitFromMob hit, above it: the attacking mob's entity id + 1
 	};
 	static_assert(sizeof(McEvent) == 32);
 
@@ -282,6 +336,8 @@ namespace skycraft::proto
 	// Minecraft things Skyrim draws itself each frame (arrows, dropped items, block cracks) + the
 	// block outline.
 	inline constexpr std::uint32_t kMaxWorldEntities = 160;
+
+	inline constexpr std::uint32_t kMobNameBytes = 32;
 
 	enum WorldEntityKind : std::uint32_t
 	{
@@ -291,6 +347,9 @@ namespace skycraft::proto
 		kWeBlock = 4,    // dropped block item: a spinning cube of side `scale`, uv[0..2] = side, top, bottom
 		kWeCrack = 5,    // block-breaking cracks over the box at (x, y, z) of size ext, uv[0] = crack stage
 		kWeShadow = 6,   // a player's or mob's feet at (x, y, z), `scale` wide: its soft contact shadow
+		kWeMob = 7,      // a Minecraft mob Skyrim's player may lock on to (not drawn: Minecraft draws it). id = entity id, (x, y, z) = its feet,
+		                 // scale = its height in blocks, ext[0] = health 0..1 (< 0: unknown), ext[1] = its width in blocks, and its name is
+		                 // zero-ended UTF-8 in the first 32 bytes of uv (kMobNameBytes)
 	};
 
 	struct WorldEntity
@@ -345,6 +404,11 @@ namespace skycraft::proto
 		                      // section NPCs collide with (sent after its kRenSection; 0 = none)
 		kRenDug = 11,         // RenDug + 512-byte bitset (bit x + 16z + 256y): which blocks of a section
 		                      // were dug out of Skyrim's world (its geometry there is gone); 0 = none
+		kRenShapes = 12,      // RenShapes + entries (sent right after kRenSolids): the exact collision
+		                      // boxes of the section's solid blocks that are NOT a full cube (slabs,
+		                      // stairs, fences, carpets...). Each entry: u16 block index (x + 16z + 256y),
+		                      // u8 boxCount, then boxCount * 6 bytes (x0 y0 z0 x1 y1 z1, sixteenths of
+		                      // a block from the block's min corner, 0..32). count 0 = none.
 		kRenRagdoll = 9,      // RenAvatar + RenBatch[] + RenVertex[]: the player's body standing still,
 		                      // relative to the feet and facing +Z, split into its parts (RenBatch
 		                      // flags bits 8-11: RagdollPart). Sent about once a second while alive;
@@ -355,6 +419,12 @@ namespace skycraft::proto
 	{
 		std::int32_t  sx, sy, sz;  // section coords, as in RenSection
 		std::uint32_t count;       // solid blocks (0: none, and no bitset follows)
+	};
+
+	struct RenShapes
+	{
+		std::int32_t  sx, sy, sz;  // section coords, as in RenSection
+		std::uint32_t count;       // blocks with their own shape (0: none, and nothing follows)
 	};
 
 	struct RenDug
@@ -566,3 +636,4 @@ namespace skycraft::proto
 	};
 	static_assert(sizeof(ColBlock) == 80);
 }
+
