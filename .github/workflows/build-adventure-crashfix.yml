@@ -1,0 +1,122 @@
+# Manual and issue-triggered release builder for the isolated SkyCraft adventure integration.
+# This workflow changes NO gameplay source on main; always checks out the integration branch.
+name: Build SkyCraft Adventure Crash Hotfix MO2
+on:
+  workflow_dispatch:
+  issue_comment:
+    types: [created]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  package:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.body == '/build-adventure-mo2') || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'hotfix/disable-crashing-mob-actor-probe')
+    runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\\.vcpkg-cache
+      VCPKG_DISABLE_METRICS: "1"
+    steps:
+      - name: Checkout merged adventure branch
+        uses: actions/checkout@v5
+        with:
+          ref: hotfix/disable-crashing-mob-actor-probe
+          submodules: recursive
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+      - name: Restore Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: adventure-gradle-${{ runner.os }}-${{ hashFiles('fabric/gradle.properties', 'fabric/build.gradle') }}-${{ github.run_id }}
+          restore-keys: |
+            adventure-gradle-${{ runner.os }}-
+      - name: Restore vcpkg cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: adventure-vcpkg-${{ runner.os }}-${{ hashFiles('skse/vcpkg.json', 'skse/CMakePresets.json') }}-${{ github.run_id }}
+          restore-keys: |
+            adventure-vcpkg-${{ runner.os }}-
+      - name: Install vcpkg for CMake
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "$env:VCPKG_DEFAULT_BINARY_CACHE" | Out-Null
+          for ($n = 1; $n -le 4; $n++) {
+            if (Test-Path .tools/vcpkg) { Remove-Item -Recurse -Force .tools/vcpkg }
+            git clone https://github.com/microsoft/vcpkg .tools/vcpkg
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($n -eq 4) { throw "vcpkg clone failed" }
+            Start-Sleep -Seconds (15 * $n)
+          }
+          .tools/vcpkg/bootstrap-vcpkg.bat -disableMetrics
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed" }
+      - name: Ensure merged gameplay and magic are present
+        shell: pwsh
+        run: |
+          $required = @(
+            "fabric/src/main/java/dev/skycraft/magic/RangedMagic.java",
+            "fabric/src/main/java/dev/skycraft/combat/SkyrimSpawner.java",
+            "fabric/src/main/java/dev/skycraft/combat/MobProxies.java",
+            "fabric/src/main/java/dev/skycraft/weapon/WeaponAffixes.java",
+            "fabric/src/main/java/dev/skycraft/armor/SkyrimArmor.java",
+            "skse/src/LockOn.cpp",
+            "skse/src/BlockCollision.cpp",
+            "skse/src/ResourceBridge.cpp",
+            "SkyCraftMappings.json"
+          )
+          foreach ($path in $required) { if (-not (Test-Path $path)) { throw "Missing $path" } }
+          if ((Select-String -Path protocol/skycraft_protocol.h -Pattern "kVersion = 17") -eq $null) { throw "Wrong C++ protocol" }
+          if ((Select-String -Path fabric/src/main/java/dev/skycraft/link/Proto.java -Pattern "VERSION = 17") -eq $null) { throw "Wrong Java protocol" }
+      - name: Configure SKSE plugin
+        shell: pwsh
+        working-directory: skse
+        run: |
+          cmake --preset default
+          if ($LASTEXITCODE -ne 0) { throw "SKSE CMake configure failed" }
+      - name: Build Skyrim DLL, Fabric JAR, and portable Minecraft MO2 package
+        shell: pwsh
+        run: |
+          & powershell -ExecutionPolicy Bypass -File tools/package.ps1
+          if ($LASTEXITCODE -ne 0) { throw "SkyCraft MO2 packaging failed" }
+      - name: Verify MO2 archive structure
+        shell: pwsh
+        run: |
+          @'
+          import zipfile, pathlib, io, sys
+          zips=list(pathlib.Path('dist').glob('SkyCraft-*.zip'))
+          zips=[p for p in zips if not p.name.endswith('-pdb.zip')]
+          assert len(zips)==1, f"Expected exactly one installable ZIP: {zips}"
+          with zipfile.ZipFile(zips[0]) as z:
+              names=set(z.namelist())
+              required={
+                  'SKSE/Plugins/SkyCraft.dll',
+                  'SKSE/Plugins/SkyCraft.ini',
+                  'SKSE/Plugins/SkyCraftMappings.json',
+                  'SKSE/Plugins/SkyCraft/SkyCraft-Minecraft.zip',
+              }
+              assert required.issubset(names), f"Missing MO2 entries: {required-names}"
+              with zipfile.ZipFile(io.BytesIO(z.read('SKSE/Plugins/SkyCraft/SkyCraft-Minecraft.zip'))) as nested:
+                  modpaths=[s for s in nested.namelist() if 'instances/SkyCraft/.minecraft/mods/' in s]
+                  assert any(s.endswith('.jar') and 'skycraft-' in s for s in modpaths), modpaths
+                  assert any('fabric-api' in s for s in modpaths), modpaths
+                  assert any('e4mc' in s for s in modpaths), modpaths
+          print(f"MO2 ZIP verified: {zips[0]}")
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw "MO2 archive verification failed" }
+      - name: Upload MO2 installer ZIP and standalone Fabric mod
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkyCraft-Adventure-CrashFix-MO2
+          path: |
+            dist/SkyCraft-*.zip
+            dist/skycraft-fabric-*.jar
+          if-no-files-found: error
+          retention-days: 30
