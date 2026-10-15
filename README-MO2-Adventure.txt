@@ -49,3 +49,5 @@ Minecraft client: %LOCALAPPDATA%/SkyCraft/Prism/instances/SkyCraft/.minecraft/lo
 Source: https://github.com/JackCakes/SkyCraft/tree/integration/sunp22-adventure
 
 Build workflow: https://github.com/JackCakes/SkyCraft/actions/workflows/build-adventure-mo2.yml
+
+HOTFIX (2026-10-15): mob stand-in actors remain enabled (bStandInActors=1); experimental custom skeletons and runtime race/NPC probing are disabled (bCustomSkeleton=0) after verified crash in Skyrim 1.7.104. NPCs should retain their native combat targeting of invisible stock-creature proxies. In-game verification is still required.
