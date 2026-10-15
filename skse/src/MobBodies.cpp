@@ -393,6 +393,8 @@ namespace skycraft
 
 		void RunProbe(RE::PlayerCharacter* a_player, float a_delta)
 		{
+			// Crash guard: experimental NPC/race cloning must be explicitly enabled.
+			if (!Cfg().actors || !Cfg().skeleton) return;
 			if (probeState == ProbeState::kDone) {
 				return;
 			}
